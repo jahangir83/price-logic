@@ -1,0 +1,36 @@
+---
+description: speclet spec-driven workflow rules
+globs: .speclet/**
+alwaysApply: false
+---
+
+# Speclet Workflow Rules
+
+When working on any speclet-related task:
+
+1. Always read `.speclet/context.md` first — it defines the project stack and conventions
+2. If `.speclet/constitution.md` exists and is filled in (no `<!-- speclet:unfilled -->` marker), read it too — it sets project ground rules that must be followed
+3. Use `.speclet/tasks/index.md` as the phase map — never guess phase file names
+4. Load one phase file at a time from `.speclet/tasks/` — never all at once
+5. If `.speclet/architecture.md` exists, read it when implementing features that touch existing modules
+6. Follow the matching prompt in `.speclet/prompts/` for each command type:
+   - Plan: `.speclet/prompts/plan.md`
+   - Map: `.speclet/prompts/map.md`
+   - Constitution: `.speclet/prompts/constitution.md`
+   - Clarify: `.speclet/prompts/clarify.md`
+   - Analyze: `.speclet/prompts/analyze.md`
+   - Tasks: `.speclet/prompts/tasks.md`
+   - Implement: `.speclet/prompts/implement.md`
+
+## Map (existing projects)
+When mapping an existing codebase, explore the project structure, read config and source files,
+then write `.speclet/context.md` (stack, conventions) and `.speclet/architecture.md` (module map).
+
+## Implement
+When implementing a phase, work through each `- [ ]` task in order, marking each `- [x]` when done.
+Do not load other phase files while implementing one phase.
+If `.speclet/architecture.md` exists, use it to understand existing module boundaries before making changes.
+
+## Tasks
+When generating tasks, write them to the phase file listed in `.speclet/tasks/index.md`.
+One phase at a time to minimise token usage.
