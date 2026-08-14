@@ -69,10 +69,11 @@ Two things it changes for every later phase:
 - **New domain shape goes into the shared model first**, then the entity, then
   the migration. See `backend/src/common/entities/README.md`.
 
-Open question for Phase 4: `campaigns.round_to` stores the price ending but has
-no strategy column, so rounding always goes **up** — a 20% discount landing on
-`11.00` becomes `11.99`. `NEAREST` is implemented and tested but unreachable
-without a `round_strategy` column.
+Resolved in J1: `campaigns.round_strategy` now exists (UP / DOWN / NEAREST),
+and `round_to` is null when the merchant turns rounding off. The default is
+still UP, so a 20% discount landing on `11.00` becomes `11.99` — worth
+revisiting with a merchant in front of it, but it is now a setting rather than
+a limitation.
 
 ## Still valid from the previous plan
 
