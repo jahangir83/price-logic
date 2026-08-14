@@ -4,6 +4,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import {
+  DuplicatePolicy,
   InitializationStatus,
   Shop,
   ShopStatus,
@@ -32,6 +33,9 @@ describe('ShopGuard', () => {
     timezone: 'UTC',
     initializationStatus: InitializationStatus.COMPLETE,
     defaultSettings: {},
+    duplicatePolicy: DuplicatePolicy.HIGHEST_DISCOUNT,
+    overrideActiveVariantLimit: null,
+    overrideActiveCampaignLimit: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

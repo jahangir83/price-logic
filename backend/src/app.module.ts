@@ -12,6 +12,8 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { SuppliersModule } from './modules/suppliers/suppliers.module';
 import { ImportsModule } from './modules/imports/imports.module';
 import { CampaignsModule } from './modules/campaigns/campaigns.module';
+import { JobsModule } from './modules/jobs/jobs.module';
+import { BillingModule } from './modules/billing/billing.module';
 
 @Module({
   imports: [
@@ -40,6 +42,8 @@ import { CampaignsModule } from './modules/campaigns/campaigns.module';
     SuppliersModule,
     ImportsModule,
     CampaignsModule,
+    JobsModule,
+    BillingModule,
   ],
   controllers: [AppController],
 })

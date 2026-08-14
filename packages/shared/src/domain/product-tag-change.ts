@@ -23,6 +23,8 @@ export interface ProductTagChange {
   id: string;
   shopId: string;
   campaignId: string;
+  /** The execution that produced this row — see `PriceChange.jobId`. */
+  jobId: string;
   shopifyProductId: string;
   /** The complete tag set before the campaign touched it. */
   oldTags: string[];

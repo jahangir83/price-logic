@@ -1,6 +1,11 @@
 import { Repository } from 'typeorm';
 import { EncryptionService } from '../../common/crypto/encryption.service';
-import { InitializationStatus, Shop, ShopStatus } from './entities/shop.entity';
+import {
+  DuplicatePolicy,
+  InitializationStatus,
+  Shop,
+  ShopStatus,
+} from './entities/shop.entity';
 import { ShopsService } from './shops.service';
 
 describe('ShopsService', () => {
@@ -69,6 +74,9 @@ describe('ShopsService', () => {
         status: ShopStatus.DISCONNECTED,
         initializationStatus: InitializationStatus.COMPLETE,
         defaultSettings: {},
+        duplicatePolicy: DuplicatePolicy.HIGHEST_DISCOUNT,
+        overrideActiveVariantLimit: null,
+        overrideActiveCampaignLimit: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       };

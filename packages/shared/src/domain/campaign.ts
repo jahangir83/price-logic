@@ -1,5 +1,31 @@
 import type { Money } from '../money/money.js';
+import type { PriceEndingStrategy } from '../money/rounding.js';
 import type { Serialized } from '../serialization.js';
+
+/**
+ * What happens when two active campaigns target the same variant.
+ *
+ * Lives here rather than beside the resolver because it is a domain choice
+ * stored on both `shops` (the merchant's global default) and `campaigns` (an
+ * optional per-campaign override); the resolver in `pricing/overlap.ts` only
+ * consumes it.
+ */
+export enum DuplicatePolicy {
+  /**
+   * The biggest discount wins — the lowest price. **Default.**
+   *
+   * Order-independent, so the right price is always recomputable from the set
+   * of campaigns currently holding the variant. That is what makes revert
+   * tractable when another campaign still owns the variant.
+   */
+  HIGHEST_DISCOUNT = 'HIGHEST_DISCOUNT',
+  /** The most recently activated campaign wins. Order-dependent. */
+  LATEST = 'LATEST',
+  /** Leave a contested variant untouched and let the merchant resolve it. */
+  SKIP = 'SKIP',
+}
+
+export const DEFAULT_DUPLICATE_POLICY = DuplicatePolicy.HIGHEST_DISCOUNT;
 
 export enum CampaignStatus {
   DRAFT = 'DRAFT',
@@ -78,9 +104,14 @@ export interface Campaign {
   adjustmentValue: Money | null;
 
   basis: CampaignBasis;
-  /** Charm-pricing ending, e.g. `0.99`. Null means no rounding. */
+  /** Charm-pricing ending, e.g. `0.99`. Null means the merchant turned rounding off. */
   roundTo: Money | null;
+  /** How a price is snapped onto `roundTo`. Ignored when `roundTo` is null. */
+  roundStrategy: PriceEndingStrategy;
   setCompareAt: boolean;
+
+  /** Null means "use the shop's global setting". */
+  duplicatePolicy: DuplicatePolicy | null;
 
   includeMode: CampaignIncludeMode;
   excludeDraftArchived: boolean;

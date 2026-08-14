@@ -29,15 +29,18 @@ export { PriceChangeStatus };
  * are cached at write time so the results screen renders without a Shopify
  * call.
  *
- * `UNIQUE (campaign_id, shopify_variant_id)` is both a domain rule (a
- * campaign touches a variant once) and the retry guard: a re-run that tries
- * to insert the same pair is rejected by the database rather than silently
- * applying the change twice. A surrogate uuid primary key is used rather than
- * a concatenated `campaignId_variantId` key so a campaign can run, revert and
- * run again without colliding.
+ * Uniqueness is `(job_id, shopify_variant_id)`, **not** `(campaign_id, …)`.
+ * Within one execution a variant is touched exactly once, so a retried
+ * activation is rejected by the database rather than silently applying the
+ * change twice — the same retry guard as before. Across executions the rows
+ * accumulate, which is what lets a campaign run, revert and run again without
+ * the second run overwriting the price the first one would need to restore.
+ * Keying on the campaign allowed exactly one row per variant forever, and
+ * quietly destroyed that price on the second activation.
  */
 @Entity('price_changes')
-@Index(['campaignId', 'shopifyVariantId'], { unique: true })
+@Index(['jobId', 'shopifyVariantId'], { unique: true })
+@Index(['shopId', 'jobId'])
 @Index(['shopId', 'campaignId'])
 @Index(['shopId', 'status'])
 export class PriceChange implements PriceChangeModel {
@@ -51,6 +54,10 @@ export class PriceChange implements PriceChangeModel {
   /** Never null — every price change belongs to exactly one campaign. */
   @Column({ name: 'campaign_id', type: 'uuid' })
   campaignId!: string;
+
+  /** The execution that wrote this row — see the uniqueness note above. */
+  @Column({ name: 'job_id', type: 'uuid' })
+  jobId!: string;
 
   @Column({ name: 'shopify_product_id', type: 'varchar' })
   shopifyProductId!: string;

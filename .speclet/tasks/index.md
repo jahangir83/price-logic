@@ -36,8 +36,8 @@ Source plan: `plans/12-jobs-billing.md`. Four phases (J1–J4) adding what the
 campaign schema has no representation of — execution attempts, retry state,
 concurrency, dependencies — plus plan limits and Shopify billing.
 
-- **J1. Job & Billing Schema** — seven tables folded into the unreleased
-  re-baseline migration
+- **J1. Job & Billing Schema** — **Complete** →
+  `tasks/mvp-phase-j1-job-billing-schema.md`
 - **J2. Job Engine & Dispatcher** — enqueue, dependencies, claiming,
   lifecycle, pause/cancel, child jobs
 - **J3. Plan Limits, Usage & Overlap Resolution** — quota enforcement and the

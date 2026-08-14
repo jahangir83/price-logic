@@ -1,4 +1,11 @@
 import {
+  DEFAULT_DUPLICATE_POLICY,
+  DuplicatePolicy,
+  InitializationStatus,
+  ShopStatus,
+  type Shop as ShopModel,
+} from '@pricelogic/shared';
+import {
   Column,
   CreateDateColumn,
   Entity,
@@ -7,17 +14,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
-export enum ShopStatus {
-  ACTIVE = 'ACTIVE',
-  DISCONNECTED = 'DISCONNECTED',
-  SUSPENDED = 'SUSPENDED',
-}
-
-export enum InitializationStatus {
-  NOT_STARTED = 'NOT_STARTED',
-  IN_PROGRESS = 'IN_PROGRESS',
-  COMPLETE = 'COMPLETE',
-}
+export { DuplicatePolicy, InitializationStatus, ShopStatus };
 
 /**
  * The tenant root. Every merchant-owned table in this app must carry a
@@ -25,7 +22,7 @@ export enum InitializationStatus {
  * enforcement pattern.
  */
 @Entity('shops')
-export class Shop {
+export class Shop implements ShopModel {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
@@ -69,6 +66,44 @@ export class Shop {
    */
   @Column({ name: 'default_settings', type: 'jsonb', default: {} })
   defaultSettings!: Record<string, unknown>;
+
+  /**
+   * The merchant's global setting for a variant claimed by two active
+   * campaigns. A campaign may override it; null on the campaign means "use
+   * this". Defaults to largest-discount-wins because that is the only
+   * order-independent option — the right price stays recomputable from the
+   * campaigns currently holding the variant, which is what makes revert work
+   * when another campaign still owns it.
+   */
+  @Column({
+    name: 'duplicate_policy',
+    type: 'enum',
+    enum: DuplicatePolicy,
+    default: DEFAULT_DUPLICATE_POLICY,
+  })
+  duplicatePolicy!: DuplicatePolicy;
+
+  /**
+   * Per-shop plan-limit overrides for an enterprise deal, a support gesture
+   * or a grandfathered merchant — the reason plan limits are data rather than
+   * constants.
+   *
+   * Null means "use the plan's own limit", **not** unlimited. Unlimited is a
+   * null limit on the plan itself.
+   */
+  @Column({
+    name: 'override_active_variant_limit',
+    type: 'integer',
+    nullable: true,
+  })
+  overrideActiveVariantLimit!: number | null;
+
+  @Column({
+    name: 'override_active_campaign_limit',
+    type: 'integer',
+    nullable: true,
+  })
+  overrideActiveCampaignLimit!: number | null;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;

@@ -26,6 +26,13 @@ export interface PriceChange {
   shopId: string;
   /** Never null — every price change belongs to exactly one campaign. */
   campaignId: string;
+  /**
+   * The execution that produced this row. Uniqueness is on
+   * `(jobId, shopifyVariantId)`, not `(campaignId, …)`, so a campaign that
+   * runs, reverts and runs again writes a fresh row each time instead of
+   * overwriting the price it would need to restore.
+   */
+  jobId: string;
 
   shopifyProductId: string;
   shopifyVariantId: string;

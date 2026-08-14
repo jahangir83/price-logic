@@ -35,7 +35,8 @@ export { ProductTagChangeStatus };
  * the one table keyed on a product rather than a variant.
  */
 @Entity('product_tag_changes')
-@Index(['campaignId', 'shopifyProductId'], { unique: true })
+@Index(['jobId', 'shopifyProductId'], { unique: true })
+@Index(['shopId', 'jobId'])
 @Index(['shopId', 'campaignId'])
 export class ProductTagChange implements ProductTagChangeModel {
   @PrimaryGeneratedColumn('uuid')
@@ -47,6 +48,10 @@ export class ProductTagChange implements ProductTagChangeModel {
 
   @Column({ name: 'campaign_id', type: 'uuid' })
   campaignId!: string;
+
+  /** The execution that wrote this row — see `PriceChange.jobId`. */
+  @Column({ name: 'job_id', type: 'uuid' })
+  jobId!: string;
 
   @Column({ name: 'shopify_product_id', type: 'varchar' })
   shopifyProductId!: string;

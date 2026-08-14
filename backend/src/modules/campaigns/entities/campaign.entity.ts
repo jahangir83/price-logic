@@ -5,8 +5,10 @@ import {
   CampaignIncludeMode,
   CampaignPriceSource,
   CampaignStatus,
+  DuplicatePolicy,
   type Campaign as CampaignModel,
   type Money,
+  type PriceEndingStrategy,
 } from '@pricelogic/shared';
 import {
   Column,
@@ -20,6 +22,7 @@ import {
 } from 'typeorm';
 
 export {
+  DuplicatePolicy,
   CampaignAdjustmentDirection,
   CampaignAdjustmentUnit,
   CampaignBasis,
@@ -121,7 +124,10 @@ export class Campaign implements CampaignModel {
   })
   basis!: CampaignBasis;
 
-  /** e.g. 0.99 rounds 10.20 up to 10.99. Null means no rounding. */
+  /**
+   * Charm-pricing ending, e.g. 0.99. **Null means the merchant turned
+   * rounding off** — it is the on/off switch, not a missing value.
+   */
   @Column({
     name: 'round_to',
     type: 'numeric',
@@ -130,6 +136,31 @@ export class Campaign implements CampaignModel {
     nullable: true,
   })
   roundTo!: Money | null;
+
+  /**
+   * How a price is snapped onto `roundTo`; ignored when rounding is off.
+   *
+   * UP always moves to the next occurrence of the ending, so a 20% discount
+   * landing on exactly 11.00 becomes 11.99 — it gives back most of the
+   * discount. NEAREST would make that 10.99. UP is the default only because
+   * it matches the behaviour this column was originally documented with.
+   */
+  @Column({
+    name: 'round_strategy',
+    type: 'enum',
+    enum: ['UP', 'DOWN', 'NEAREST'],
+    default: 'UP',
+  })
+  roundStrategy!: PriceEndingStrategy;
+
+  /** Null means "use the shop's global setting". */
+  @Column({
+    name: 'duplicate_policy',
+    type: 'enum',
+    enum: DuplicatePolicy,
+    nullable: true,
+  })
+  duplicatePolicy!: DuplicatePolicy | null;
 
   /**
    * When true, activation moves the old price into compare-at so the
