@@ -15,6 +15,13 @@ export interface AppConfig {
   };
   encryptionKey: string;
   frontendUrl: string;
+  uploads: {
+    /**
+     * Where supplier sheets are written. Outside the web root by default —
+     * the file is merchant data and must not be fetchable by guessing a URL.
+     */
+    dir: string;
+  };
   jobs: {
     /** 'false' keeps the dispatcher dormant — used by the test suite. */
     dispatcherEnabled: string;
@@ -43,6 +50,9 @@ export default (): AppConfig => ({
   },
   encryptionKey: process.env.ENCRYPTION_KEY as string,
   frontendUrl: process.env.FRONTEND_URL as string,
+  uploads: {
+    dir: process.env.UPLOADS_DIR ?? `${process.cwd()}/../uploads`,
+  },
   jobs: {
     dispatcherEnabled: process.env.JOBS_DISPATCHER_ENABLED ?? 'true',
     pollIntervalMs: parseInt(process.env.JOBS_POLL_INTERVAL_MS ?? '1000', 10),
