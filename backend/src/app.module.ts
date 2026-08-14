@@ -9,15 +9,9 @@ import { ShopifyAuthModule } from './modules/shopify-auth/shopify-auth.module';
 import { ShopsModule } from './modules/shops/shops.module';
 import { StoreInitModule } from './modules/store-init/store-init.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
-import { ProductsModule } from './modules/products/products.module';
 import { SuppliersModule } from './modules/suppliers/suppliers.module';
 import { ImportsModule } from './modules/imports/imports.module';
-import { PricingRulesModule } from './modules/pricing-rules/pricing-rules.module';
-import { PricingOperationsModule } from './modules/pricing-operations/pricing-operations.module';
-import { PriceHistoryModule } from './modules/price-history/price-history.module';
 import { CampaignsModule } from './modules/campaigns/campaigns.module';
-import { SchedulesModule } from './modules/schedules/schedules.module';
-import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 
 @Module({
   imports: [
@@ -43,15 +37,9 @@ import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
     ShopifyAuthModule,
     StoreInitModule,
     WebhooksModule,
-    ProductsModule,
     SuppliersModule,
     ImportsModule,
-    PricingRulesModule,
-    PricingOperationsModule,
-    PriceHistoryModule,
     CampaignsModule,
-    SchedulesModule,
-    AuditLogsModule,
   ],
   controllers: [AppController],
 })
