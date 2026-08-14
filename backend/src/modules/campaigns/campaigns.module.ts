@@ -12,6 +12,12 @@ import { CampaignsService } from './campaigns.service';
 import { CampaignPreviewService } from './preview.service';
 import { TargetResolverService } from './target-resolver.service';
 import { ShopifyModule } from '../shopify/shopify.module';
+import { BillingModule } from '../billing/billing.module';
+import { JobsModule } from '../jobs/jobs.module';
+import { CsvRow } from '../imports/entities/csv-row.entity';
+import { Shop } from '../shops/entities/shop.entity';
+import { ActivationService } from './activation.service';
+import { CampaignJobHandlers } from './campaign-job.handlers';
 
 /**
  * The campaign aggregate: the container plus everything it owns — its
@@ -23,11 +29,15 @@ import { ShopifyModule } from '../shopify/shopify.module';
   imports: [
     AuthModule,
     ShopifyModule,
+    BillingModule,
+    JobsModule,
     TypeOrmModule.forFeature([
       Campaign,
       CampaignTarget,
       PriceChange,
       ProductTagChange,
+      CsvRow,
+      Shop,
     ]),
   ],
   controllers: [CampaignsController],
@@ -37,6 +47,8 @@ import { ShopifyModule } from '../shopify/shopify.module';
     CampaignTargetsService,
     TargetResolverService,
     CampaignPreviewService,
+    ActivationService,
+    CampaignJobHandlers,
   ],
   exports: [
     TypeOrmModule,
@@ -45,6 +57,7 @@ import { ShopifyModule } from '../shopify/shopify.module';
     CampaignTargetsService,
     TargetResolverService,
     CampaignPreviewService,
+    ActivationService,
   ],
 })
 export class CampaignsModule {}

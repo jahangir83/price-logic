@@ -15,6 +15,7 @@ import {
 } from '@nestjs/common';
 import {
   CampaignTargetMode,
+  JobType,
   type CampaignPreviewResponse,
   type PaginatedResponse,
 } from '@pricelogic/shared';
@@ -24,6 +25,8 @@ import { Shop } from '../shops/entities/shop.entity';
 import { CampaignTargetsService } from './campaign-targets.service';
 import { CampaignsService } from './campaigns.service';
 import { CampaignPreviewService } from './preview.service';
+import { ActivationService } from './activation.service';
+import { JobsService } from '../jobs/jobs.service';
 import { allowedTransitions } from './campaign-status';
 import {
   CampaignTargetInputDto,
@@ -54,6 +57,8 @@ export class CampaignsController {
     private readonly campaigns: CampaignsService,
     private readonly targets: CampaignTargetsService,
     private readonly previewService: CampaignPreviewService,
+    private readonly activation: ActivationService,
+    private readonly jobs: JobsService,
   ) {}
 
   @Get()
@@ -131,6 +136,34 @@ export class CampaignsController {
       page: page ? Number(page) : undefined,
       pageSize: pageSize ? Number(pageSize) : undefined,
     });
+  }
+
+  /**
+   * Start a campaign.
+   *
+   * Enqueues a job rather than applying inline: activation can touch tens of
+   * thousands of variants behind a rate limit, which no HTTP request should
+   * hold open. The eligibility check runs here so an ineligible campaign is
+   * refused immediately instead of failing a second later in a worker.
+   *
+   * `concurrencyKey` is what stops a campaign being applied twice, and the
+   * dedup key collapses a double click into one job.
+   */
+  @Post(':id/activate')
+  async activate(
+    @Req() request: RequestWithShop,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<{ jobId: string; campaignId: string }> {
+    await this.activation.assertActivatable(request.shop, id);
+
+    const job = await this.jobs.enqueueSerialized(request.shop.id, {
+      type: JobType.CAMPAIGN_ACTIVATE,
+      campaignId: id,
+      concurrencyKey: 'campaign-exec',
+      dedupKey: `activate:${id}`,
+    });
+
+    return { jobId: job.id, campaignId: id };
   }
 
   // -----------------------------------------------------------------

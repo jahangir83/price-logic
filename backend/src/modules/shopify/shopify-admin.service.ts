@@ -7,6 +7,7 @@ import {
   ShopifyProductSummary,
   ShopifyVariantSummary,
   parseMoney,
+  toShopifyPrice,
 } from '@pricelogic/shared';
 import { Shop } from '../shops/entities/shop.entity';
 import { ShopsService } from '../shops/shops.service';
@@ -37,6 +38,20 @@ export interface SkuMatch {
  * applied without a second lookup per product — a campaign excluding one
  * vendor should not cost one query per product to find out.
  */
+/** One variant's new prices, ready to send. */
+export interface VariantPriceUpdate {
+  variantId: string;
+  price: Money;
+  compareAtPrice: Money | null;
+}
+
+/** What Shopify did with one variant in a bulk update. */
+export interface VariantUpdateOutcome {
+  variantId: string;
+  applied: boolean;
+  error: string | null;
+}
+
 export interface CatalogVariant extends VariantPriceRecord {
   productStatus: ShopifyProductStatus;
   productTags: string[];
@@ -521,6 +536,126 @@ export class ShopifyAdminService {
     return variants;
   }
 
+  // -------------------------------------------------------------------
+  // Mutations
+  // -------------------------------------------------------------------
+
+  /**
+   * Write new prices for one product's variants.
+   *
+   * `productVariantsBulkUpdate` takes many variants of a *single* product per
+   * call, which is why activation groups by product — one call for a
+   * twelve-variant shirt instead of twelve.
+   *
+   * Per-variant failures come back as `userErrors` alongside the successes.
+   * They are returned rather than thrown: one bad variant must not abandon the
+   * other eleven, and the caller records each outcome on its own row.
+   */
+  async updateVariantPrices(
+    shop: Shop,
+    productId: string,
+    variants: readonly VariantPriceUpdate[],
+  ): Promise<VariantUpdateOutcome[]> {
+    if (variants.length === 0) return [];
+
+    const data = await this.client.request<{
+      productVariantsBulkUpdate: {
+        productVariants: { id: string }[] | null;
+        userErrors: { field: string[] | null; message: string }[];
+      };
+    }>({
+      ...this.credentials(shop),
+      estimatedCost: 10 + variants.length,
+      query: VARIANTS_BULK_UPDATE_MUTATION,
+      variables: {
+        productId,
+        variants: variants.map((variant) => ({
+          id: variant.variantId,
+          // Shopify stores two decimal places; sending four is rejected.
+          price: toShopifyPrice(variant.price),
+          ...(variant.compareAtPrice === null
+            ? { compareAtPrice: null }
+            : { compareAtPrice: toShopifyPrice(variant.compareAtPrice) }),
+        })),
+      },
+    });
+
+    const result = data.productVariantsBulkUpdate;
+    const updated = new Set(
+      (result.productVariants ?? []).map((variant) => variant.id),
+    );
+
+    /*
+     * Shopify reports errors positionally — `field: ["variants", "3", "price"]`
+     * — so the index is how a message is attributed to the right variant. A
+     * message with no usable index applies to the whole call.
+     */
+    const errorsByIndex = new Map<number, string>();
+    let batchError: string | null = null;
+    for (const error of result.userErrors) {
+      const index = Number(error.field?.[1]);
+      if (Number.isInteger(index)) {
+        errorsByIndex.set(index, error.message);
+      } else {
+        batchError = batchError
+          ? `${batchError}; ${error.message}`
+          : error.message;
+      }
+    }
+
+    return variants.map((variant, index) => {
+      const error = errorsByIndex.get(index) ?? batchError;
+      if (error) {
+        return { variantId: variant.variantId, applied: false, error };
+      }
+      // No error and not in the returned set means Shopify silently ignored
+      // it; treating that as success would mark a row APPLIED that never was.
+      if (!updated.has(variant.variantId)) {
+        return {
+          variantId: variant.variantId,
+          applied: false,
+          error: 'Shopify did not confirm this variant was updated.',
+        };
+      }
+      return { variantId: variant.variantId, applied: true, error: null };
+    });
+  }
+
+  /**
+   * Replace a product's tag set.
+   *
+   * The whole list is written rather than adding and removing individually,
+   * because the caller has already computed the exact resulting set and
+   * `product_tag_changes` records that same list — so what is stored and what
+   * is sent cannot drift.
+   */
+  async updateProductTags(
+    shop: Shop,
+    productId: string,
+    tags: readonly string[],
+  ): Promise<{ applied: boolean; error: string | null }> {
+    const data = await this.client.request<{
+      productUpdate: {
+        product: { id: string } | null;
+        userErrors: { message: string }[];
+      };
+    }>({
+      ...this.credentials(shop),
+      estimatedCost: 10,
+      query: PRODUCT_TAGS_UPDATE_MUTATION,
+      variables: { input: { id: productId, tags: [...tags] } },
+    });
+
+    const errors = data.productUpdate.userErrors;
+    if (errors.length > 0) {
+      return {
+        applied: false,
+        error: errors.map((error) => error.message).join('; '),
+      };
+    }
+    return { applied: data.productUpdate.product !== null, error: null };
+  }
+
   /** Drop cached catalog data for a shop — call after changing prices. */
   invalidate(shopId: string): void {
     this.cache.invalidateShop(shopId);
@@ -760,6 +895,27 @@ const PRODUCT_NODES_QUERY = `
   query ProductsByIds($ids: [ID!]!) {
     nodes(ids: $ids) {
       ... on Product { ${PRODUCT_WITH_VARIANTS_FIELDS} }
+    }
+  }
+`;
+
+const VARIANTS_BULK_UPDATE_MUTATION = `
+  mutation UpdateVariantPrices(
+    $productId: ID!
+    $variants: [ProductVariantsBulkInput!]!
+  ) {
+    productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+      productVariants { id }
+      userErrors { field message }
+    }
+  }
+`;
+
+const PRODUCT_TAGS_UPDATE_MUTATION = `
+  mutation UpdateProductTags($input: ProductInput!) {
+    productUpdate(input: $input) {
+      product { id }
+      userErrors { field message }
     }
   }
 `;
