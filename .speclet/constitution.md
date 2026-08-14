@@ -49,11 +49,20 @@ application, not plumbing bolted on beside it.
   reaches a **terminal** state — SUCCEEDED *or* FAILED — because the purpose
   is ordering, not success-gating. A failed first edit must not strand the
   second one in the queue forever.
-- **The `jobs` table owns execution state: which step is complete and what
-  runs next.** Step order is defined per job type in code; the row records the
-  current step and a cursor for resuming inside it. There is no separate step
-  table — batching granularity comes from child jobs, so a second table would
-  record the same progress twice and give two places for it to disagree.
+- **A job is the intent; a job execution is one attempt at it.** `jobs` holds
+  what should happen (name, payload, schedule, priority, retry policy,
+  dependencies); `job_executions` holds each run — its current step, try
+  count, progress and result. One job therefore has many executions, which is
+  what makes a retried or resumed job legible after the fact instead of
+  overwriting its own history.
+- **A superseded execution is marked obsolete, never deleted.** When a
+  merchant edits a campaign that is mid-run, the in-flight execution is
+  flagged and a new one supersedes it. Deleting it would destroy the record of
+  what had already been written to Shopify, which is the only thing revert can
+  work from.
+- **Every job carries a deduplication key.** Two identical requests — a double
+  click, a webhook redelivery, a scheduler firing twice — must collapse into
+  one job rather than two competing executions.
 - **The dependency graph exists for billing, duplicate resolution, and
   serialising concurrent merchant edits.** Do not remove it later as
   "unnecessary complexity" — these are the reasons it is there.
@@ -93,10 +102,23 @@ Plans: Free 50 / Starter 2,000 / Plus 20,000 / Professional unlimited
   rather than a generic failure.
 - **A downgrade never retroactively stops a running campaign.** The limit
   gates new activations only.
-- **Plan limits live in `@pricelogic/shared`** so the pricing page, the usage
-  meter and the server-side enforcement all read the same numbers. A limit
-  that exists in two places will eventually disagree, and the disagreement is
-  revenue.
+- **Plans and their limits live in the database, not in code.** Prices and
+  caps change for commercial reasons, and a per-store override — an enterprise
+  deal, a support gesture, a grandfathered merchant — must not require a
+  deploy. `@pricelogic/shared` owns the plan *handle* enum and the DTO; the
+  numbers come from `app_plans`, with `store_plan_overrides` taking precedence
+  where present (null means "use the plan default").
+- **Usage counters are a cache for the UI; enforcement recomputes.**
+  `store_usage` keeps `active_variant_count` and `active_campaign_count` so
+  the meter renders without a scan, and carries `last_reconciled_at` because a
+  denormalized counter always drifts eventually. The quota check at activation
+  recomputes from `price_changes` rather than trusting the counter — it runs
+  once per activation, already holds the shop's concurrency lock, and is
+  gating revenue.
+- **Billing state is append-only.** Every upgrade, downgrade, renewal and
+  cancellation is recorded as a subscription event with its from/to plan.
+  Merchants dispute charges, and the current row alone cannot answer "what was
+  I on when this was billed?"
 - Concurrency 1 per shop on campaign start/end is what makes the quota check
   race-free: two activations cannot both pass the check and then both apply.
   This is a second reason that rule exists — do not relax it for throughput.
