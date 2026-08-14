@@ -116,8 +116,9 @@ that the 2026-08-12 redesign replaced. Kept as history — do not implement.
 
 ## Documentation debt
 
-`plans/07-database.md` still describes the superseded 17-table schema across 50
-sections, and `plans/03-domain-model.md` still models suppliers, costs, margins
-and pricing operations. Both need revising or marking superseded — the project's
-own rule (`00-readme.md` §9) is that documentation is updated before
-implementation. Decision pending.
+- `plans/07-database.md` — **resolved 2026-08-14.** Marked superseded; the
+  schema as built is now documented in `plans/13-database-map.md`, read from a
+  live database rather than from intent.
+- `plans/03-domain-model.md` still models suppliers, costs, margins and pricing
+  operations. Needs revising or marking superseded — the project's own rule
+  (`00-readme.md` §9) is that documentation is updated before implementation.
