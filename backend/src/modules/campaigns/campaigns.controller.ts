@@ -166,6 +166,32 @@ export class CampaignsController {
     return { jobId: job.id, campaignId: id };
   }
 
+  /**
+   * End a campaign early.
+   *
+   * Runs the **same** revert path as a scheduled end — there is no second code
+   * path, and the only difference is what triggered it. Enqueued at a higher
+   * priority than activations so a shop with both queued puts prices back
+   * before it starts anything new.
+   */
+  @Post(':id/deactivate')
+  async deactivate(
+    @Req() request: RequestWithShop,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<{ jobId: string; campaignId: string }> {
+    await this.campaigns.findOne(request.shop.id, id);
+
+    const job = await this.jobs.enqueue(request.shop.id, {
+      type: JobType.CAMPAIGN_REVERT,
+      campaignId: id,
+      concurrencyKey: 'campaign-exec',
+      dedupKey: `revert:${id}`,
+      priority: 10,
+    });
+
+    return { jobId: job.id, campaignId: id };
+  }
+
   // -----------------------------------------------------------------
   // Targets
   // -----------------------------------------------------------------

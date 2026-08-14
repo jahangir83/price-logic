@@ -22,6 +22,17 @@ export interface AppConfig {
      */
     dir: string;
   };
+  scheduler: {
+    /** 'false' keeps the sweep dormant — used by the test suite. */
+    enabled: string;
+    intervalMs: number;
+    /**
+     * How late a campaign may start after downtime before it is abandoned.
+     * Deactivation has no equivalent — a campaign past its end is always
+     * reverted, however late.
+     */
+    activationGraceMs: number;
+  };
   jobs: {
     /** 'false' keeps the dispatcher dormant — used by the test suite. */
     dispatcherEnabled: string;
@@ -52,6 +63,14 @@ export default (): AppConfig => ({
   frontendUrl: process.env.FRONTEND_URL as string,
   uploads: {
     dir: process.env.UPLOADS_DIR ?? `${process.cwd()}/../uploads`,
+  },
+  scheduler: {
+    enabled: process.env.SCHEDULER_ENABLED ?? 'true',
+    intervalMs: parseInt(process.env.SCHEDULER_INTERVAL_MS ?? '30000', 10),
+    activationGraceMs: parseInt(
+      process.env.SCHEDULER_ACTIVATION_GRACE_MS ?? '3600000',
+      10,
+    ),
   },
   jobs: {
     dispatcherEnabled: process.env.JOBS_DISPATCHER_ENABLED ?? 'true',

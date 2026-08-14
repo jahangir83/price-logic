@@ -9,6 +9,7 @@ import {
 } from '../jobs/job-handler';
 import { Shop } from '../shops/entities/shop.entity';
 import { ActivationService } from './activation.service';
+import { RevertService } from './revert.service';
 
 /**
  * Campaign activation, as a job.
@@ -25,6 +26,7 @@ export class CampaignJobHandlers implements OnModuleInit {
   constructor(
     private readonly registry: JobHandlerRegistry,
     private readonly activation: ActivationService,
+    private readonly revert: RevertService,
     @InjectRepository(Shop)
     private readonly shops: Repository<Shop>,
   ) {}
@@ -34,6 +36,59 @@ export class CampaignJobHandlers implements OnModuleInit {
       type: JobType.CAMPAIGN_ACTIVATE,
       run: (context) => this.activate(context),
     });
+    this.registry.register({
+      type: JobType.CAMPAIGN_REVERT,
+      run: (context) => this.revertCampaign(context),
+    });
+  }
+
+  /**
+   * Put a campaign's prices and tags back.
+   *
+   * Unlike activation, a revert that could not finish everything does **not**
+   * fail the job outright — the rows it could not restore stay APPLIED, so the
+   * next attempt picks them up. Failing here as well would only add noise to
+   * a queue an operator is already going to look at.
+   */
+  private async revertCampaign(context: JobContext): Promise<void> {
+    const campaignId = context.job.campaignId;
+    if (!campaignId) {
+      throw new PermanentJobError(
+        'This job has no campaign attached.',
+        'MISSING_CAMPAIGN_ID',
+      );
+    }
+
+    const shop = await this.shops.findOne({
+      where: { id: context.job.shopId },
+    });
+    if (!shop) {
+      throw new PermanentJobError(
+        'The shop is no longer connected.',
+        'SHOP_DISCONNECTED',
+      );
+    }
+
+    await context.advanceTo(JobStep.RESTORE_PRICES);
+
+    const outcome = await this.revert.revert(shop, campaignId, {
+      onProgress: async (progress) => {
+        await context.report({
+          total: progress.total,
+          processed: progress.reverted + progress.skipped,
+          failed: progress.failed,
+        });
+      },
+      shouldStop: () => context.shouldStop(),
+    });
+
+    await context.advanceTo(JobStep.FINALIZE);
+
+    this.logger.log(
+      `Campaign ${campaignId} reverted: ${outcome.reverted} restored, ` +
+        `${outcome.skipped} left alone, ${outcome.failed} failed, ` +
+        `${outcome.tagsReverted} product(s) re-tagged`,
+    );
   }
 
   private async activate(context: JobContext): Promise<void> {

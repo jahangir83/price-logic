@@ -18,6 +18,8 @@ import { CsvRow } from '../imports/entities/csv-row.entity';
 import { Shop } from '../shops/entities/shop.entity';
 import { ActivationService } from './activation.service';
 import { CampaignJobHandlers } from './campaign-job.handlers';
+import { RevertService } from './revert.service';
+import { CampaignSchedulerService } from './scheduler.service';
 
 /**
  * The campaign aggregate: the container plus everything it owns — its
@@ -48,6 +50,8 @@ import { CampaignJobHandlers } from './campaign-job.handlers';
     TargetResolverService,
     CampaignPreviewService,
     ActivationService,
+    RevertService,
+    CampaignSchedulerService,
     CampaignJobHandlers,
   ],
   exports: [
@@ -58,6 +62,8 @@ import { CampaignJobHandlers } from './campaign-job.handlers';
     TargetResolverService,
     CampaignPreviewService,
     ActivationService,
+    RevertService,
+    CampaignSchedulerService,
   ],
 })
 export class CampaignsModule {}

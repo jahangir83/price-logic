@@ -21,4 +21,5 @@ export * from './domain/index.js';
 export * from './dto/index.js';
 export * from './money/index.js';
 export * from './pricing/index.js';
+export * from './scheduling/index.js';
 export * from './serialization.js';
