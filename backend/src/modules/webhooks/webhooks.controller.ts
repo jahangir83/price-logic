@@ -13,6 +13,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import { Repository } from 'typeorm';
+import { SubscriptionsService } from '../billing/subscriptions.service';
 import { ShopsService } from '../shops/shops.service';
 import { WebhookDelivery } from './entities/webhook-delivery.entity';
 import { ShopErasureService } from './shop-erasure.service';
@@ -45,6 +46,7 @@ export class WebhooksController {
     private readonly configService: ConfigService,
     private readonly shopsService: ShopsService,
     private readonly erasure: ShopErasureService,
+    private readonly subscriptions: SubscriptionsService,
     @InjectRepository(WebhookDelivery)
     private readonly deliveries: Repository<WebhookDelivery>,
   ) {}
@@ -75,6 +77,39 @@ export class WebhooksController {
          * trying to write to a store we can no longer reach.
          */
         await this.shopsService.disconnectByDomain(domain);
+      },
+    );
+  }
+
+  /**
+   * `app_subscriptions/update` — the authoritative signal for every billing
+   * change after the merchant first confirms: renewal, cancellation, a frozen
+   * card, expiry.
+   *
+   * We never decide a merchant is paying; we record what Shopify tells us.
+   */
+  @Post('app-subscriptions-update')
+  @HttpCode(200)
+  async appSubscriptionsUpdate(
+    @Req() req: RawBodyRequest<Request>,
+    @Headers('x-shopify-hmac-sha256') hmac: string | undefined,
+    @Headers('x-shopify-shop-domain') shopDomain: string | undefined,
+    @Headers('x-shopify-webhook-id') webhookId: string | undefined,
+  ): Promise<{ received: true }> {
+    return this.handle(
+      req,
+      { hmac, shopDomain, webhookId, topic: 'app_subscriptions/update' },
+      async (domain) => {
+        const shop = await this.shopsService.findByDomain(domain);
+        if (!shop) {
+          // Uninstalled before the webhook landed. Nothing to update, and
+          // throwing would only make Shopify retry a shop that is gone.
+          this.logger.warn(
+            `app_subscriptions/update for unknown shop ${domain}`,
+          );
+          return;
+        }
+        await this.subscriptions.handleWebhook(shop.id, safeJson(req.rawBody));
       },
     );
   }

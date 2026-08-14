@@ -5,9 +5,15 @@ import { StoreSubscriptionEvent } from './entities/store-subscription-event.enti
 import { StoreSubscription } from './entities/store-subscription.entity';
 import { StoreUsage } from './entities/store-usage.entity';
 import { BillingService } from './billing.service';
+import { BillingController } from './billing.controller';
+import { SubscriptionsService } from './subscriptions.service';
+import { AuthModule } from '../../common/auth/auth.module';
+import { ShopifyModule } from '../shopify/shopify.module';
 
 @Module({
   imports: [
+    AuthModule,
+    ShopifyModule,
     TypeOrmModule.forFeature([
       AppPlan,
       StoreSubscription,
@@ -15,7 +21,8 @@ import { BillingService } from './billing.service';
       StoreUsage,
     ]),
   ],
-  providers: [BillingService],
-  exports: [TypeOrmModule, BillingService],
+  controllers: [BillingController],
+  providers: [BillingService, SubscriptionsService],
+  exports: [TypeOrmModule, BillingService, SubscriptionsService],
 })
 export class BillingModule {}

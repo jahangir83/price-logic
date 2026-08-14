@@ -13,6 +13,7 @@ import { Shop } from '../shops/entities/shop.entity';
 import { ShopsService } from '../shops/shops.service';
 import { TTL, ShopifyResponseCache } from './response-cache';
 import { ShopifyGraphQlClient } from './shopify-graphql.client';
+import { ShopifyApiError } from './shopify.errors';
 
 /** A variant resolved for pricing — the shape Phases 4-6 consume. */
 export interface VariantPriceRecord {
@@ -43,6 +44,18 @@ export interface VariantPriceUpdate {
   variantId: string;
   price: Money;
   compareAtPrice: Money | null;
+}
+
+/** A subscription as Shopify sees it. Their status strings, not ours. */
+export interface ShopifySubscriptionState {
+  subscriptionGid: string;
+  /** ACTIVE | PENDING | DECLINED | EXPIRED | FROZEN | CANCELLED */
+  status: string;
+  name: string;
+  test: boolean;
+  trialDays: number;
+  currentPeriodEnd: string | null;
+  createdAt: string;
 }
 
 /** What Shopify did with one variant in a bulk update. */
@@ -656,6 +669,154 @@ export class ShopifyAdminService {
     return { applied: data.productUpdate.product !== null, error: null };
   }
 
+  // -------------------------------------------------------------------
+  // Billing
+  // -------------------------------------------------------------------
+
+  /**
+   * Create a recurring charge and get the URL the merchant must confirm at.
+   *
+   * Nothing is charged until they accept — Shopify hosts that screen, and we
+   * only learn the outcome from the return redirect and the
+   * `APP_SUBSCRIPTIONS_UPDATE` webhook. The subscription is therefore PENDING
+   * from our side until Shopify says otherwise.
+   *
+   * `test: true` in development, so a dev store can accept a charge without
+   * anyone being billed.
+   */
+  async createSubscription(
+    shop: Shop,
+    input: {
+      planName: string;
+      priceCents: number;
+      interval: 'EVERY_30_DAYS' | 'ANNUAL';
+      trialDays: number;
+      returnUrl: string;
+      currencyCode?: string;
+      test?: boolean;
+    },
+  ): Promise<{ subscriptionGid: string; confirmationUrl: string }> {
+    const data = await this.client.request<{
+      appSubscriptionCreate: {
+        appSubscription: { id: string } | null;
+        confirmationUrl: string | null;
+        userErrors: { field: string[] | null; message: string }[];
+      };
+    }>({
+      ...this.credentials(shop),
+      estimatedCost: 10,
+      query: APP_SUBSCRIPTION_CREATE_MUTATION,
+      variables: {
+        name: input.planName,
+        returnUrl: input.returnUrl,
+        trialDays: input.trialDays,
+        test: input.test ?? false,
+        lineItems: [
+          {
+            plan: {
+              appRecurringPricingDetails: {
+                // Shopify wants a decimal string; our prices are integer cents.
+                price: {
+                  amount: (input.priceCents / 100).toFixed(2),
+                  currencyCode: input.currencyCode ?? 'USD',
+                },
+                interval: input.interval,
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    const result = data.appSubscriptionCreate;
+    if (result.userErrors.length > 0) {
+      throw ShopifyApiError.userError(
+        result.userErrors.map((error) => error.message).join('; '),
+      );
+    }
+    if (!result.appSubscription || !result.confirmationUrl) {
+      throw ShopifyApiError.unavailable(
+        'Shopify did not return a subscription to confirm.',
+      );
+    }
+
+    return {
+      subscriptionGid: result.appSubscription.id,
+      confirmationUrl: result.confirmationUrl,
+    };
+  }
+
+  /**
+   * Ask Shopify what a subscription's status actually is.
+   *
+   * Used on the confirmation return rather than trusting the redirect: the
+   * merchant lands back on our URL whether they accepted or declined, and the
+   * query string is not a signature.
+   */
+  async fetchSubscription(
+    shop: Shop,
+    subscriptionGid: string,
+  ): Promise<ShopifySubscriptionState | null> {
+    const data = await this.client.request<{
+      node: {
+        id: string;
+        status: string;
+        name: string;
+        test: boolean;
+        trialDays: number;
+        currentPeriodEnd: string | null;
+        createdAt: string;
+      } | null;
+    }>({
+      ...this.credentials(shop),
+      estimatedCost: 5,
+      query: APP_SUBSCRIPTION_QUERY,
+      variables: { id: subscriptionGid },
+    });
+
+    if (!data.node) return null;
+    return {
+      subscriptionGid: data.node.id,
+      status: data.node.status,
+      name: data.node.name,
+      test: data.node.test,
+      trialDays: data.node.trialDays,
+      currentPeriodEnd: data.node.currentPeriodEnd,
+      createdAt: data.node.createdAt,
+    };
+  }
+
+  /** Cancel a charge. Shopify does this itself on a replacement, so this is
+   * only for a merchant cancelling outright. */
+  async cancelSubscription(
+    shop: Shop,
+    subscriptionGid: string,
+  ): Promise<{ cancelled: boolean; error: string | null }> {
+    const data = await this.client.request<{
+      appSubscriptionCancel: {
+        appSubscription: { id: string; status: string } | null;
+        userErrors: { message: string }[];
+      };
+    }>({
+      ...this.credentials(shop),
+      estimatedCost: 10,
+      query: APP_SUBSCRIPTION_CANCEL_MUTATION,
+      variables: { id: subscriptionGid },
+    });
+
+    const errors = data.appSubscriptionCancel.userErrors;
+    if (errors.length > 0) {
+      return {
+        cancelled: false,
+        error: errors.map((error) => error.message).join('; '),
+      };
+    }
+    return {
+      cancelled: data.appSubscriptionCancel.appSubscription !== null,
+      error: null,
+    };
+  }
+
   /** Drop cached catalog data for a shop — call after changing prices. */
   invalidate(shopId: string): void {
     this.cache.invalidateShop(shopId);
@@ -895,6 +1056,53 @@ const PRODUCT_NODES_QUERY = `
   query ProductsByIds($ids: [ID!]!) {
     nodes(ids: $ids) {
       ... on Product { ${PRODUCT_WITH_VARIANTS_FIELDS} }
+    }
+  }
+`;
+
+const APP_SUBSCRIPTION_CREATE_MUTATION = `
+  mutation CreateAppSubscription(
+    $name: String!
+    $returnUrl: URL!
+    $trialDays: Int
+    $test: Boolean
+    $lineItems: [AppSubscriptionLineItemInput!]!
+  ) {
+    appSubscriptionCreate(
+      name: $name
+      returnUrl: $returnUrl
+      trialDays: $trialDays
+      test: $test
+      lineItems: $lineItems
+    ) {
+      appSubscription { id status }
+      confirmationUrl
+      userErrors { field message }
+    }
+  }
+`;
+
+const APP_SUBSCRIPTION_QUERY = `
+  query AppSubscription($id: ID!) {
+    node(id: $id) {
+      ... on AppSubscription {
+        id
+        status
+        name
+        test
+        trialDays
+        currentPeriodEnd
+        createdAt
+      }
+    }
+  }
+`;
+
+const APP_SUBSCRIPTION_CANCEL_MUTATION = `
+  mutation CancelAppSubscription($id: ID!) {
+    appSubscriptionCancel(id: $id) {
+      appSubscription { id status }
+      userErrors { field message }
     }
   }
 `;

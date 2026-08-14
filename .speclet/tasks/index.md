@@ -42,15 +42,13 @@ concurrency, dependencies — plus plan limits and Shopify billing.
   `tasks/mvp-phase-j2-job-engine-dispatcher.md`
 - **J3. Plan Limits, Usage & Overlap Resolution** — **Complete** →
   `tasks/mvp-phase-j3-plan-limits-usage-overlap.md`
-- **J4. Shopify Billing Integration** — subscriptions, webhooks, trials
+- **J4. Shopify Billing Integration** — **Complete** (unverified against a real
+  store) → `tasks/mvp-phase-j4-shopify-billing.md`
 
-```
-MVP 1 (done) ──> J1 ──> J2 ──┬──> J3 ──> MVP 6 (activation)
-                              └──> J4 (blocked: needs a dev store)
-```
-
-J1 must land while the re-baseline migration is still unreleased. J2 and J3
-gate MVP Phase 6, the first phase that writes to Shopify.
+All four complete. **Every phase in the plan is now built.** What remains
+before launch is not more phases — it is a development store, webhook
+registration at install, and confirming the pinned API version. See
+`plans/14-launch-readiness.md`.
 
 ## Shared type package (`packages/shared`)
 
