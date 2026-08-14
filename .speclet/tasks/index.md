@@ -12,7 +12,7 @@ other phase starts.
 - **1. Schema Re-baseline** → `tasks/mvp-phase-01-schema-re-baseline.md`
 - **2. Live Shopify Catalog Access** — **Complete** (unverified against a real store) → `tasks/mvp-phase-02-live-shopify-catalog-access.md`
 - **3. Campaign Builder & Targeting** — **Complete** → `tasks/mvp-phase-03-campaign-builder-targeting.md`
-- **4. Price Calculation & Preview** → `tasks/mvp-phase-04-price-calculation-preview.md`
+- **4. Price Calculation & Preview** — **Complete** → `tasks/mvp-phase-04-price-calculation-preview.md`
 - **5. Supplier Sheet Upload & Approval** → `tasks/mvp-phase-05-supplier-sheet-upload-approval.md`
 - **6. Activation — Applying Changes to Shopify** → `tasks/mvp-phase-06-activation.md`
 - **7. Deactivation, Revert & Scheduling** → `tasks/mvp-phase-07-deactivation-revert-scheduling.md`

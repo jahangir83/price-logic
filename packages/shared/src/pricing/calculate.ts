@@ -74,12 +74,46 @@ export type PriceCalculationOutcome =
   /** The result fell below `minPrice` and was clamped to it. */
   | 'FLOORED';
 
+export type PriceCalculationWarning =
+  /**
+   * Rounding moved the price *against* the adjustment's direction — a
+   * discount that ended up higher than the price it was discounting, or an
+   * increase that ended up lower.
+   *
+   * The UP strategy causes this whenever the discount is smaller than the gap
+   * to the next charm ending: rounding 11.00 up to a `.99` ending gives 11.99,
+   * so a campaign with rounding on and no adjustment *raises* prices. The
+   * caller decides what to do — the preview flags it, and NEAREST avoids it.
+   */
+  | 'ROUNDING_OPPOSED_DIRECTION'
+  /**
+   * `setCompareAt` was on but writing one would not have shown a saving, so
+   * it was left alone rather than striking through a number at or below what
+   * the customer pays.
+   */
+  | 'COMPARE_AT_SUPPRESSED';
+
 export interface PriceCalculationResult {
   newPrice: Money;
   newCompareAtPrice: Money | null;
   outcome: PriceCalculationOutcome;
   /** False when nothing needs to be written or sent to Shopify. */
   changed: boolean;
+  /** Non-fatal observations the caller may surface or act on. */
+  warnings: PriceCalculationWarning[];
+}
+
+/**
+ * Should this row be written to Shopify, or recorded as SKIPPED?
+ *
+ * A floored price is a nonsense price — the campaign asked for more off than
+ * the product costs — and writing zero is worse than writing nothing, because
+ * the merchant cannot tell the difference between "free by design" and "the
+ * maths went wrong". An unchanged row is skipped because there is nothing to
+ * send.
+ */
+export function shouldApply(result: PriceCalculationResult): boolean {
+  return result.changed && result.outcome !== 'FLOORED';
 }
 
 /**
@@ -135,19 +169,27 @@ export function calculatePrice(
     throw new RangeError(`basePrice must not be negative: ${basePrice}`);
   }
 
-  let newPrice = input.adjustment
+  const warnings: PriceCalculationWarning[] = [];
+
+  const adjusted = input.adjustment
     ? applyAdjustment(basePrice, input.adjustment)
     : basePrice;
+  let newPrice = adjusted;
 
   if (input.roundTo != null) {
     // Round only what the floor will not immediately override.
-    newPrice = compare(newPrice, minPrice) < 0
-      ? newPrice
-      : applyPriceEnding(
-          newPrice,
-          parseMoney(input.roundTo, 'roundTo'),
-          input.roundStrategy ?? DEFAULT_PRICE_ENDING_STRATEGY,
-        );
+    newPrice =
+      compare(newPrice, minPrice) < 0
+        ? newPrice
+        : applyPriceEnding(
+            newPrice,
+            parseMoney(input.roundTo, 'roundTo'),
+            input.roundStrategy ?? DEFAULT_PRICE_ENDING_STRATEGY,
+          );
+
+    if (opposedDirection(basePrice, adjusted, newPrice)) {
+      warnings.push('ROUNDING_OPPOSED_DIRECTION');
+    }
   }
 
   let floored = false;
@@ -163,8 +205,12 @@ export function calculatePrice(
    * unhelpful campaign configuration is dropped rather than displayed.
    */
   let newCompareAtPrice = currentCompareAtPrice;
-  if (input.setCompareAt && compare(currentPrice, newPrice) > 0) {
-    newCompareAtPrice = currentPrice;
+  if (input.setCompareAt) {
+    if (compare(currentPrice, newPrice) > 0) {
+      newCompareAtPrice = currentPrice;
+    } else {
+      warnings.push('COMPARE_AT_SUPPRESSED');
+    }
   }
 
   const priceMoved = !equals(newPrice, currentPrice);
@@ -181,5 +227,30 @@ export function calculatePrice(
     newCompareAtPrice,
     outcome: floored ? 'FLOORED' : changed ? 'CHANGED' : 'UNCHANGED',
     changed,
+    warnings,
   };
+}
+
+/**
+ * Did rounding push the price back past where the adjustment left it, relative
+ * to the base? A decrease that rounds up above the base price, or an increase
+ * that rounds down below it.
+ */
+function opposedDirection(
+  basePrice: Money,
+  adjusted: Money,
+  rounded: Money,
+): boolean {
+  const adjustmentDirection = compare(adjusted, basePrice);
+  if (adjustmentDirection === 0) {
+    /*
+     * No adjustment, so there is no direction to oppose — but rounding that
+     * *raises* a price is still a surprise worth flagging, because UP is the
+     * default and a merchant who only asked to tidy their price endings did
+     * not ask for an increase. Rounding down is exactly what they asked for.
+     */
+    return compare(rounded, basePrice) > 0;
+  }
+  const roundedDirection = compare(rounded, basePrice);
+  return roundedDirection !== 0 && roundedDirection !== adjustmentDirection;
 }

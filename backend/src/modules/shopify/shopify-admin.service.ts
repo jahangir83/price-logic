@@ -30,6 +30,20 @@ export interface SkuMatch {
   variants: VariantPriceRecord[];
 }
 
+/**
+ * A variant plus the product facets targeting needs.
+ *
+ * Carries the parent's tags, vendor, type and status so an exclusion can be
+ * applied without a second lookup per product — a campaign excluding one
+ * vendor should not cost one query per product to find out.
+ */
+export interface CatalogVariant extends VariantPriceRecord {
+  productStatus: ShopifyProductStatus;
+  productTags: string[];
+  productVendor: string | null;
+  productType: string | null;
+}
+
 interface GqlPageInfo {
   hasNextPage: boolean;
   endCursor: string | null;
@@ -45,6 +59,20 @@ interface GqlProductNode {
   tags: string[];
   featuredImage: { url: string } | null;
   variantsCount: { count: number } | null;
+}
+
+interface GqlProductWithVariants extends GqlProductNode {
+  variants: {
+    edges: {
+      node: {
+        id: string;
+        title: string;
+        sku: string | null;
+        price: string;
+        compareAtPrice: string | null;
+      };
+    }[];
+  };
 }
 
 interface GqlVariantNode {
@@ -372,6 +400,127 @@ export class ShopifyAdminService {
     return unique.map((sku) => ({ sku, variants: bySku.get(sku) ?? [] }));
   }
 
+  // -------------------------------------------------------------------
+  // Enumeration, for target resolution
+  // -------------------------------------------------------------------
+
+  /**
+   * Every variant of every product matching a Shopify search query.
+   *
+   * Paginated all the way through, because an ALL_PRODUCTS campaign on a real
+   * store is tens of thousands of variants and a single page would silently
+   * price a fraction of the catalog — the worst kind of wrong, because it
+   * looks like it worked.
+   *
+   * `limit` caps the walk. Hitting it is reported rather than hidden: a
+   * preview that says "showing the first 10,000" is honest, one that just
+   * stops is not.
+   */
+  async listVariantsMatching(
+    shop: Shop,
+    query: string | null,
+    options: { limit?: number } = {},
+  ): Promise<{ variants: CatalogVariant[]; truncated: boolean }> {
+    const limit = options.limit ?? DEFAULT_RESOLUTION_LIMIT;
+    const variants: CatalogVariant[] = [];
+    let after: string | null = null;
+    let hasNextPage = true;
+
+    while (hasNextPage && variants.length < limit) {
+      const data: {
+        products: {
+          edges: { node: GqlProductWithVariants }[];
+          pageInfo: GqlPageInfo;
+        };
+      } = await this.client.request({
+        ...this.credentials(shop),
+        // Products are cheap; their variant connections are not.
+        estimatedCost: PRODUCT_PAGE_SIZE * 3,
+        query: PRODUCTS_WITH_VARIANTS_QUERY,
+        variables: { first: PRODUCT_PAGE_SIZE, after, query },
+      });
+
+      for (const edge of data.products.edges) {
+        variants.push(...toCatalogVariants(edge.node));
+      }
+      hasNextPage = data.products.pageInfo.hasNextPage;
+      after = data.products.pageInfo.endCursor;
+    }
+
+    return {
+      variants: variants.slice(0, limit),
+      truncated:
+        variants.length > limit || (hasNextPage && variants.length >= limit),
+    };
+  }
+
+  /** Every variant of a collection's products. */
+  async listCollectionVariants(
+    shop: Shop,
+    collectionId: string,
+    options: { limit?: number } = {},
+  ): Promise<{ variants: CatalogVariant[]; truncated: boolean }> {
+    const limit = options.limit ?? DEFAULT_RESOLUTION_LIMIT;
+    const variants: CatalogVariant[] = [];
+    let after: string | null = null;
+    let hasNextPage = true;
+
+    while (hasNextPage && variants.length < limit) {
+      const data: {
+        collection: {
+          products: {
+            edges: { node: GqlProductWithVariants }[];
+            pageInfo: GqlPageInfo;
+          };
+        } | null;
+      } = await this.client.request({
+        ...this.credentials(shop),
+        estimatedCost: PRODUCT_PAGE_SIZE * 3,
+        query: COLLECTION_VARIANTS_QUERY,
+        variables: { id: collectionId, first: PRODUCT_PAGE_SIZE, after },
+      });
+
+      // A collection deleted since the merchant picked it resolves to nothing
+      // rather than failing the whole campaign.
+      if (!data.collection) break;
+
+      for (const edge of data.collection.products.edges) {
+        variants.push(...toCatalogVariants(edge.node));
+      }
+      hasNextPage = data.collection.products.pageInfo.hasNextPage;
+      after = data.collection.products.pageInfo.endCursor;
+    }
+
+    return {
+      variants: variants.slice(0, limit),
+      truncated: hasNextPage && variants.length >= limit,
+    };
+  }
+
+  /** Every variant of the named products. */
+  async listProductVariants(
+    shop: Shop,
+    productIds: readonly string[],
+  ): Promise<CatalogVariant[]> {
+    if (productIds.length === 0) return [];
+
+    const variants: CatalogVariant[] = [];
+    for (const batch of chunk(productIds, PRODUCT_NODE_BATCH)) {
+      const data = await this.client.request<{
+        nodes: (GqlProductWithVariants | null)[];
+      }>({
+        ...this.credentials(shop),
+        estimatedCost: batch.length * 3,
+        query: PRODUCT_NODES_QUERY,
+        variables: { ids: batch },
+      });
+      for (const node of data.nodes) {
+        if (node) variants.push(...toCatalogVariants(node));
+      }
+    }
+    return variants;
+  }
+
   /** Drop cached catalog data for a shop — call after changing prices. */
   invalidate(shopId: string): void {
     this.cache.invalidateShop(shopId);
@@ -426,6 +575,26 @@ function toVariantPriceRecord(node: GqlVariantNode): VariantPriceRecord {
   };
 }
 
+function toCatalogVariants(node: GqlProductWithVariants): CatalogVariant[] {
+  const status = toProductStatus(node.status);
+  return node.variants.edges.map((edge) => ({
+    variantId: edge.node.id,
+    productId: node.id,
+    productTitle: node.title,
+    variantTitle: edge.node.title,
+    sku: edge.node.sku,
+    price: parseMoney(edge.node.price, 'variant.price'),
+    compareAtPrice:
+      edge.node.compareAtPrice === null
+        ? null
+        : parseMoney(edge.node.compareAtPrice, 'variant.compareAtPrice'),
+    productStatus: status,
+    productTags: node.tags,
+    productVendor: node.vendor,
+    productType: node.productType,
+  }));
+}
+
 export function toVariantSummary(
   record: VariantPriceRecord,
   inventoryQuantity: number | null = null,
@@ -452,6 +621,15 @@ function clampPageSize(first: number | undefined): number {
 
 const VARIANT_BATCH_SIZE = 250;
 const SKU_BATCH_SIZE = 50;
+/** Products per page while enumerating; each carries up to 100 variants. */
+const PRODUCT_PAGE_SIZE = 50;
+const PRODUCT_NODE_BATCH = 50;
+/**
+ * Safety ceiling on one resolution. A store with more variants than this in
+ * scope needs the bulk operations API, not a paged walk — and the preview says
+ * so rather than pretending it saw everything.
+ */
+export const DEFAULT_RESOLUTION_LIMIT = 50_000;
 
 function chunk<T>(items: readonly T[], size: number): T[][] {
   const out: T[][] = [];
@@ -539,6 +717,49 @@ const VARIANT_NODES_QUERY = `
   query VariantPrices($ids: [ID!]!) {
     nodes(ids: $ids) {
       ... on ProductVariant { ${VARIANT_FIELDS} }
+    }
+  }
+`;
+
+const PRODUCT_WITH_VARIANTS_FIELDS = `
+  id
+  title
+  handle
+  status
+  vendor
+  productType
+  tags
+  featuredImage { url }
+  variantsCount { count }
+  variants(first: 100) {
+    edges { node { id title sku price compareAtPrice } }
+  }
+`;
+
+const PRODUCTS_WITH_VARIANTS_QUERY = `
+  query ProductsWithVariants($first: Int!, $after: String, $query: String) {
+    products(first: $first, after: $after, query: $query) {
+      edges { node { ${PRODUCT_WITH_VARIANTS_FIELDS} } }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+`;
+
+const COLLECTION_VARIANTS_QUERY = `
+  query CollectionVariants($id: ID!, $first: Int!, $after: String) {
+    collection(id: $id) {
+      products(first: $first, after: $after) {
+        edges { node { ${PRODUCT_WITH_VARIANTS_FIELDS} } }
+        pageInfo { hasNextPage endCursor }
+      }
+    }
+  }
+`;
+
+const PRODUCT_NODES_QUERY = `
+  query ProductsByIds($ids: [ID!]!) {
+    nodes(ids: $ids) {
+      ... on Product { ${PRODUCT_WITH_VARIANTS_FIELDS} }
     }
   }
 `;

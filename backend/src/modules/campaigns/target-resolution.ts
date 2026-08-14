@@ -38,6 +38,21 @@ import type {
  * list, which is why `validatePriceSource` rejects a sheet campaign that also
  * carries targets.
  *
+ * ## Collection membership is resolved at activation, not at creation
+ *
+ * A campaign targeting a collection asks the collection what it contains *at
+ * the moment it runs*. A product added to that collection between saving the
+ * campaign and starting it **is** included; one removed is not.
+ *
+ * This is deliberate. A collection is a live set — that is what makes it
+ * useful for "everything in Summer Sale" — and freezing its members at save
+ * time would make a scheduled campaign quietly price yesterday's catalog.
+ * The cost is that a preview and the activation that follows it can differ if
+ * the catalog changed in between, which is why the preview is display-only and
+ * activation recomputes.
+ *
+ * Merchants ask about this, so the campaign form says it in as many words.
+ *
  * ## Matching, per target type
  *
  * | Type | `targetValue` | Matches |

@@ -109,10 +109,16 @@ export function TargetingSection({ form, onChange }: TargetingSectionProps) {
                 />
               ) : null}
               {includeTab === 1 ? (
-                <CollectionPicker
-                  selectedIds={form.includeCollections}
-                  onChange={(ids) => onChange({ includeCollections: ids })}
-                />
+                <BlockStack gap="200">
+                  <Text as="p" tone="subdued">
+                    Collections are checked when the campaign runs, so products
+                    you add to them before then are included automatically.
+                  </Text>
+                  <CollectionPicker
+                    selectedIds={form.includeCollections}
+                    onChange={(ids) => onChange({ includeCollections: ids })}
+                  />
+                </BlockStack>
               ) : null}
               {includeTab === 2 ? (
                 <FacetPicker

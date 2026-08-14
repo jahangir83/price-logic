@@ -9,6 +9,9 @@ import { OverlapService } from './overlap.service';
 import { CampaignTargetsService } from './campaign-targets.service';
 import { CampaignsController } from './campaigns.controller';
 import { CampaignsService } from './campaigns.service';
+import { CampaignPreviewService } from './preview.service';
+import { TargetResolverService } from './target-resolver.service';
+import { ShopifyModule } from '../shopify/shopify.module';
 
 /**
  * The campaign aggregate: the container plus everything it owns — its
@@ -19,6 +22,7 @@ import { CampaignsService } from './campaigns.service';
 @Module({
   imports: [
     AuthModule,
+    ShopifyModule,
     TypeOrmModule.forFeature([
       Campaign,
       CampaignTarget,
@@ -27,12 +31,20 @@ import { CampaignsService } from './campaigns.service';
     ]),
   ],
   controllers: [CampaignsController],
-  providers: [OverlapService, CampaignsService, CampaignTargetsService],
+  providers: [
+    OverlapService,
+    CampaignsService,
+    CampaignTargetsService,
+    TargetResolverService,
+    CampaignPreviewService,
+  ],
   exports: [
     TypeOrmModule,
     OverlapService,
     CampaignsService,
     CampaignTargetsService,
+    TargetResolverService,
+    CampaignPreviewService,
   ],
 })
 export class CampaignsModule {}

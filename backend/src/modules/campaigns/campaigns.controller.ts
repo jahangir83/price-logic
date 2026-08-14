@@ -13,12 +13,17 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { CampaignTargetMode, type PaginatedResponse } from '@pricelogic/shared';
+import {
+  CampaignTargetMode,
+  type CampaignPreviewResponse,
+  type PaginatedResponse,
+} from '@pricelogic/shared';
 import { SessionAuthGuard } from '../../common/auth/session-auth.guard';
 import { ShopGuard } from '../../common/auth/shop.guard';
 import { Shop } from '../shops/entities/shop.entity';
 import { CampaignTargetsService } from './campaign-targets.service';
 import { CampaignsService } from './campaigns.service';
+import { CampaignPreviewService } from './preview.service';
 import { allowedTransitions } from './campaign-status';
 import {
   CampaignTargetInputDto,
@@ -48,6 +53,7 @@ export class CampaignsController {
   constructor(
     private readonly campaigns: CampaignsService,
     private readonly targets: CampaignTargetsService,
+    private readonly previewService: CampaignPreviewService,
   ) {}
 
   @Get()
@@ -105,6 +111,26 @@ export class CampaignsController {
     @Body() dto: ChangeCampaignStatusDto,
   ): Promise<Campaign> {
     return this.campaigns.changeStatus(request.shop.id, id, dto.status);
+  }
+
+  /**
+   * What this campaign would do, without doing it.
+   *
+   * Display-only and persists nothing. Phase 6 recomputes from the campaign
+   * configuration rather than reading anything returned here — no endpoint
+   * accepts a price, so nothing a client sends can reach an applied price.
+   */
+  @Get(':id/preview')
+  async preview(
+    @Req() request: RequestWithShop,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ): Promise<CampaignPreviewResponse> {
+    return this.previewService.preview(request.shop, id, {
+      page: page ? Number(page) : undefined,
+      pageSize: pageSize ? Number(pageSize) : undefined,
+    });
   }
 
   // -----------------------------------------------------------------
