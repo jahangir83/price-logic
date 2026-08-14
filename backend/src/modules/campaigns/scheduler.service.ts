@@ -20,6 +20,18 @@ export interface SchedulerSweep {
 /** Default grace: a campaign more than an hour late is not started. */
 const DEFAULT_GRACE_MS = 60 * 60_000;
 
+/*
+ * An uninstalled merchant's campaigns must not keep trying to write. The
+ * app/uninstalled webhook moves the shop to DISCONNECTED; this is what makes
+ * that status mean something to the scheduler rather than being a label.
+ *
+ * It applies to deactivation too — there is nothing to put back on a store we
+ * cannot reach, and every attempt would fail on a revoked token.
+ */
+const ACTIVE_SHOP_ONLY = `EXISTS (
+  SELECT 1 FROM shops s WHERE s.id = c.shop_id AND s.status = 'ACTIVE'
+)`;
+
 /**
  * Starts and ends campaigns when their schedule says so.
  *
@@ -114,6 +126,7 @@ export class CampaignSchedulerService
       .where('c.status = :status', { status: CampaignStatus.SCHEDULED })
       .andWhere('c.start_at IS NOT NULL AND c.start_at <= :now', { now })
       .andWhere('c.deleted_at IS NULL')
+      .andWhere(ACTIVE_SHOP_ONLY)
       .orderBy('c.start_at', 'ASC')
       .limit(500)
       .getMany();
@@ -162,6 +175,7 @@ export class CampaignSchedulerService
       .where('c.status = :status', { status: CampaignStatus.ACTIVE })
       .andWhere('c.end_at IS NOT NULL AND c.end_at <= :now', { now })
       .andWhere('c.deleted_at IS NULL')
+      .andWhere(ACTIVE_SHOP_ONLY)
       .orderBy('c.end_at', 'ASC')
       .limit(500)
       .getMany();

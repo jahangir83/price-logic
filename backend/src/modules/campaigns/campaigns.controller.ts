@@ -17,6 +17,8 @@ import {
   CampaignTargetMode,
   JobType,
   type CampaignPreviewResponse,
+  type CampaignProgressResponse,
+  type CampaignResultsResponse,
   type PaginatedResponse,
 } from '@pricelogic/shared';
 import { SessionAuthGuard } from '../../common/auth/session-auth.guard';
@@ -190,6 +192,40 @@ export class CampaignsController {
     });
 
     return { jobId: job.id, campaignId: id };
+  }
+
+  /**
+   * What the campaign actually did.
+   *
+   * **Failures first** — that is why a merchant opens this screen. Readable
+   * without a Shopify call, because the product and variant titles were cached
+   * on the row at write time.
+   */
+  @Get(':id/results')
+  async results(
+    @Req() request: RequestWithShop,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ): Promise<CampaignResultsResponse> {
+    return this.campaigns.results(request.shop.id, id, {
+      page: page ? Number(page) : undefined,
+      pageSize: pageSize ? Number(pageSize) : undefined,
+    });
+  }
+
+  /**
+   * Live counters while a campaign is being applied or reverted.
+   *
+   * Polled by the UI so a bulk run over tens of thousands of variants shows a
+   * real progress bar. A long operation behind a spinner reads as broken.
+   */
+  @Get(':id/progress')
+  async progress(
+    @Req() request: RequestWithShop,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<CampaignProgressResponse> {
+    return this.campaigns.progress(request.shop.id, id);
   }
 
   // -----------------------------------------------------------------

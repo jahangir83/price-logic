@@ -9,7 +9,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import {
   CampaignStatus,
   DEFAULT_PAGE_SIZE,
+  PriceChangeStatus,
+  type CampaignProgressResponse,
+  type CreateCampaignRequest,
+  type ListCampaignsQuery,
+  type UpdateCampaignRequest,
+  type CampaignResultsResponse,
   type PaginatedResponse,
+  type PriceChangeDto,
 } from '@pricelogic/shared';
 import { ILike, Repository } from 'typeorm';
 import { TenantScopedRepository } from '../../common/tenant/tenant-scoped.repository';
@@ -21,11 +28,18 @@ import {
 import { validateCampaign } from './campaign-rules';
 import { CampaignTarget } from './entities/campaign-target.entity';
 import { Campaign } from './entities/campaign.entity';
-import type {
-  CreateCampaignDto,
-  ListCampaignsDto,
-  UpdateCampaignDto,
-} from './dto/campaign.dto';
+import { PriceChange } from './entities/price-change.entity';
+/**
+ * The service takes the **shared** request contract, not the DTO class.
+ *
+ * Two reasons. The sheet-approval path builds a campaign server-side and has
+ * no DTO to construct, and the DTO carries internal marker fields the
+ * validator reads — leaking those into every caller's type would make an
+ * ordinary `{ title: 'x' }` fail to compile.
+ */
+export type CreateCampaignInput = CreateCampaignRequest;
+export type UpdateCampaignInput = UpdateCampaignRequest;
+export type ListCampaignsInput = ListCampaignsQuery;
 
 @Injectable()
 export class CampaignsService {
@@ -36,7 +50,108 @@ export class CampaignsService {
     private readonly campaigns: Repository<Campaign>,
     @InjectRepository(CampaignTarget)
     private readonly targets: Repository<CampaignTarget>,
+    @InjectRepository(PriceChange)
+    private readonly priceChanges: Repository<PriceChange>,
   ) {}
+
+  /**
+   * What a campaign did, one page at a time.
+   *
+   * Ordered failures first. A merchant opening this screen is almost always
+   * asking "what went wrong?", and making them page past four thousand
+   * successful rows to find out is a worse answer than no screen at all.
+   */
+  async results(
+    shopId: string,
+    id: string,
+    options: { page?: number; pageSize?: number } = {},
+  ): Promise<CampaignResultsResponse> {
+    await this.findOne(shopId, id);
+
+    const page = Math.max(1, options.page ?? 1);
+    const pageSize = Math.min(
+      Math.max(options.pageSize ?? DEFAULT_PAGE_SIZE, 1),
+      250,
+    );
+
+    const [items, totalItems] = await this.priceChanges
+      .createQueryBuilder('pc')
+      .where('pc.shop_id = :shopId AND pc.campaign_id = :id', { shopId, id })
+      .orderBy(
+        `CASE pc.status
+           WHEN 'FAILED' THEN 0
+           WHEN 'PENDING' THEN 1
+           WHEN 'APPLIED' THEN 2
+           WHEN 'REVERTED' THEN 3
+           ELSE 4 END`,
+        'ASC',
+      )
+      .addOrderBy('pc.product_title', 'ASC')
+      .skip((page - 1) * pageSize)
+      .take(pageSize)
+      .getManyAndCount();
+
+    const counts = await this.countByStatus(shopId, id);
+
+    return {
+      campaignId: id,
+      applied: counts[PriceChangeStatus.APPLIED] ?? 0,
+      failed: counts[PriceChangeStatus.FAILED] ?? 0,
+      skipped: counts[PriceChangeStatus.SKIPPED] ?? 0,
+      reverted: counts[PriceChangeStatus.REVERTED] ?? 0,
+      changes: items as unknown as PriceChangeDto[],
+      page,
+      pageSize,
+      totalItems,
+      totalPages: Math.max(1, Math.ceil(totalItems / pageSize)),
+    };
+  }
+
+  /** Live counters, for the progress bar. */
+  async progress(
+    shopId: string,
+    id: string,
+  ): Promise<CampaignProgressResponse> {
+    const campaign = await this.findOne(shopId, id);
+    const counts = await this.countByStatus(shopId, id);
+
+    const pending = counts[PriceChangeStatus.PENDING] ?? 0;
+    const total = Object.values(counts).reduce((sum, n) => sum + n, 0);
+
+    return {
+      campaignId: id,
+      status: campaign.status,
+      // Still work outstanding, so the UI keeps polling.
+      running: pending > 0,
+      total,
+      applied: counts[PriceChangeStatus.APPLIED] ?? 0,
+      failed: counts[PriceChangeStatus.FAILED] ?? 0,
+      skipped: counts[PriceChangeStatus.SKIPPED] ?? 0,
+      reverted: counts[PriceChangeStatus.REVERTED] ?? 0,
+      pending,
+    };
+  }
+
+  /** One indexed group-by rather than five counts. */
+  private async countByStatus(
+    shopId: string,
+    campaignId: string,
+  ): Promise<Partial<Record<PriceChangeStatus, number>>> {
+    const rows = await this.priceChanges
+      .createQueryBuilder('pc')
+      .select('pc.status', 'status')
+      .addSelect('count(*)', 'count')
+      .where('pc.shop_id = :shopId AND pc.campaign_id = :campaignId', {
+        shopId,
+        campaignId,
+      })
+      .groupBy('pc.status')
+      .getRawMany<{ status: PriceChangeStatus; count: string }>();
+
+    return Object.fromEntries(
+      rows.map((row) => [row.status, Number(row.count)]),
+    );
+  }
 
   /**
    * Every read and write goes through here, so a query can never be written
@@ -47,7 +162,7 @@ export class CampaignsService {
     return new TenantScopedRepository(this.campaigns, shopId);
   }
 
-  async create(shopId: string, dto: CreateCampaignDto): Promise<Campaign> {
+  async create(shopId: string, dto: CreateCampaignInput): Promise<Campaign> {
     // The DTO validator already ran these; running them again means the
     // sheet-approval path, which builds a campaign without a DTO, cannot skip
     // them by accident.
@@ -81,7 +196,7 @@ export class CampaignsService {
 
   async list(
     shopId: string,
-    query: ListCampaignsDto,
+    query: ListCampaignsInput,
   ): Promise<PaginatedResponse<Campaign>> {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? DEFAULT_PAGE_SIZE;
@@ -111,7 +226,7 @@ export class CampaignsService {
   async update(
     shopId: string,
     id: string,
-    dto: UpdateCampaignDto,
+    dto: UpdateCampaignInput,
   ): Promise<Campaign> {
     const campaign = await this.findOne(shopId, id);
     this.assertEditable(campaign);

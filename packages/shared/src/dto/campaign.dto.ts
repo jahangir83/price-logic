@@ -107,7 +107,31 @@ export interface CampaignResultsResponse {
   failed: number;
   skipped: number;
   reverted: number;
+  /** One page of rows, failures first. */
   changes: PriceChangeDto[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+}
+
+/**
+ * Live counters while a campaign runs.
+ *
+ * `total` is what the run is working through, so `processed / total` is a real
+ * progress bar rather than a spinner. `running` tells the UI whether to keep
+ * polling.
+ */
+export interface CampaignProgressResponse {
+  campaignId: string;
+  status: CampaignStatus;
+  running: boolean;
+  total: number;
+  applied: number;
+  failed: number;
+  skipped: number;
+  reverted: number;
+  pending: number;
 }
 
 /** Activation and deactivation are async; the UI polls the campaign after. */
