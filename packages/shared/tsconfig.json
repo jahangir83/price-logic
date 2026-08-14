@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+
+    // CommonJS is the base because ts-jest and editor tooling read this file.
+    // The published ESM build overrides module/moduleResolution in
+    // tsconfig.esm.json — the source itself is written to compile as both,
+    // which is why every relative import carries an explicit `.js` extension.
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+
+    "strict": true,
+    "declaration": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "isolatedModules": true
+  },
+  "include": ["src"]
+}
