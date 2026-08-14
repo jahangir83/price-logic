@@ -40,8 +40,8 @@ concurrency, dependencies — plus plan limits and Shopify billing.
   `tasks/mvp-phase-j1-job-billing-schema.md`
 - **J2. Job Engine & Dispatcher** — **Complete** →
   `tasks/mvp-phase-j2-job-engine-dispatcher.md`
-- **J3. Plan Limits, Usage & Overlap Resolution** — quota enforcement and the
-  two-campaigns-one-variant problem
+- **J3. Plan Limits, Usage & Overlap Resolution** — **Complete** →
+  `tasks/mvp-phase-j3-plan-limits-usage-overlap.md`
 - **J4. Shopify Billing Integration** — subscriptions, webhooks, trials
 
 ```

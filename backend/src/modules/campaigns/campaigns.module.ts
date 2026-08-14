@@ -4,6 +4,7 @@ import { Campaign } from './entities/campaign.entity';
 import { CampaignTarget } from './entities/campaign-target.entity';
 import { PriceChange } from './entities/price-change.entity';
 import { ProductTagChange } from './entities/product-tag-change.entity';
+import { OverlapService } from './overlap.service';
 
 /**
  * The campaign aggregate: the container plus everything it owns — its
@@ -20,6 +21,7 @@ import { ProductTagChange } from './entities/product-tag-change.entity';
       ProductTagChange,
     ]),
   ],
-  exports: [TypeOrmModule],
+  providers: [OverlapService],
+  exports: [TypeOrmModule, OverlapService],
 })
 export class CampaignsModule {}
