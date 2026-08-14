@@ -123,6 +123,6 @@ the `app_subscriptions/update` payload. **No charge has ever been created.**
 Still outstanding for submission:
 
 - a Partner account and a development store
-- webhook topic **registration** at install — the handlers exist and are
-  tested; nothing subscribes to them
+- ~~webhook topic **registration** at install~~ — done: `WebhookRegistrarService`
+  subscribes all five topics on every install and reinstall
 - confirm `SHOPIFY_API_VERSION=2025-01` is still supported

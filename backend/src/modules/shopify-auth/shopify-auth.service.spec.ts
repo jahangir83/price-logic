@@ -5,6 +5,7 @@ import {
   ShopStatus,
 } from '../shops/entities/shop.entity';
 import { ShopsService } from '../shops/shops.service';
+import { WebhookRegistrarService } from '../shopify/webhook-registrar.service';
 import { StoreInitService } from '../store-init/store-init.service';
 import { OAuthFlowError, ShopifyAuthService } from './shopify-auth.service';
 import { ShopifyOAuthService } from './shopify-oauth.service';
@@ -20,6 +21,7 @@ describe('ShopifyAuthService', () => {
   let shopsService: { upsertFromInstall: jest.Mock };
   let sessionService: { sign: jest.Mock };
   let storeInitService: { initialize: jest.Mock };
+  let webhookRegistrar: { registerAll: jest.Mock };
   let service: ShopifyAuthService;
 
   const VALID_SHOP = 'my-store.myshopify.com';
@@ -53,12 +55,23 @@ describe('ShopifyAuthService', () => {
     storeInitService = {
       initialize: jest.fn((shop: Shop) => Promise.resolve(shop)),
     };
+    webhookRegistrar = {
+      registerAll: jest.fn(() =>
+        Promise.resolve({
+          total: 5,
+          registered: 5,
+          alreadyPresent: 0,
+          failed: [],
+        }),
+      ),
+    };
 
     service = new ShopifyAuthService(
       oauthService as unknown as ShopifyOAuthService,
       shopsService as unknown as ShopsService,
       sessionService as unknown as SessionService,
       storeInitService as unknown as StoreInitService,
+      webhookRegistrar as unknown as WebhookRegistrarService,
     );
   });
 
@@ -123,6 +136,29 @@ describe('ShopifyAuthService', () => {
       expect(storeInitService.initialize).toHaveBeenCalled();
       expect(sessionService.sign).toHaveBeenCalledWith({ shopId: 'shop-1' });
       expect(result.sessionToken).toBe('signed-jwt');
+    });
+
+    it('subscribes the shop to webhooks with the freshly exchanged token', async () => {
+      // Install is the only moment we are certain to have a working token, and
+      // a reinstall gets no subscriptions carried over — so it has to happen
+      // here rather than lazily on first use.
+      await service.completeInstall(query, 'state-1');
+
+      expect(webhookRegistrar.registerAll).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'shop-1' }),
+        'shpat_abc',
+      );
+    });
+
+    it('still completes the install when webhook registration fails', async () => {
+      // A merchant with a working app and one missing webhook is far better off
+      // than one who cannot install at all.
+      webhookRegistrar.registerAll.mockRejectedValue(new Error('Shopify down'));
+
+      const result = await service.completeInstall(query, 'state-1');
+
+      expect(result.sessionToken).toBe('signed-jwt');
+      expect(shopsService.upsertFromInstall).toHaveBeenCalled();
     });
   });
 });

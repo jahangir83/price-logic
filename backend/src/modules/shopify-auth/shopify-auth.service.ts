@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { SessionService } from '../session/session.service';
 import { Shop } from '../shops/entities/shop.entity';
 import { ShopsService } from '../shops/shops.service';
+import { WebhookRegistrarService } from '../shopify/webhook-registrar.service';
 import { StoreInitService } from '../store-init/store-init.service';
 import { ShopifyOAuthService } from './shopify-oauth.service';
 
@@ -29,6 +30,7 @@ export class ShopifyAuthService {
     private readonly shopsService: ShopsService,
     private readonly sessionService: SessionService,
     private readonly storeInitService: StoreInitService,
+    private readonly webhookRegistrar: WebhookRegistrarService,
   ) {}
 
   /** Step 1 of install: build the Shopify authorize redirect + a state nonce to store in a cookie. */
@@ -94,6 +96,32 @@ export class ShopifyAuthService {
     });
 
     await this.storeInitService.initialize(savedShop);
+
+    /*
+     * Subscribe to our webhooks now, with the token we just received.
+     *
+     * Runs on reinstall too: Shopify does not carry subscriptions across an
+     * uninstall, so a returning merchant would otherwise have an app that
+     * never hears about their next uninstall — or their billing.
+     *
+     * Deliberately not awaited into the failure path. A merchant with a
+     * working app and one missing webhook is far better off than one who
+     * cannot install at all, so a failure is logged and the install proceeds.
+     */
+    try {
+      const result = await this.webhookRegistrar.registerAll(
+        savedShop,
+        tokenResult.accessToken,
+      );
+      if (result.failed.length > 0) {
+        this.logger.warn(
+          `Installed ${shop} with ${result.failed.length} webhook(s) unregistered: ` +
+            result.failed.map((entry) => entry.topic).join(', '),
+        );
+      }
+    } catch (error) {
+      this.logger.error(`Webhook registration failed for ${shop}`, error);
+    }
 
     const sessionToken = this.sessionService.sign({ shopId: savedShop.id });
     return { shop: savedShop, sessionToken };

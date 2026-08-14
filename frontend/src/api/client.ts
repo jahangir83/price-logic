@@ -1,6 +1,8 @@
 import type { ApiErrorResponse } from '@pricelogic/shared';
 
-const API_URL = import.meta.env.VITE_API_URL as string;
+/** Origin of the backend. Exported because the boot sequence needs to build a
+ * top-frame OAuth URL, which is a navigation rather than a fetch. */
+export const API_URL = import.meta.env.VITE_API_URL as string;
 
 export class ApiError extends Error {
   status: number;

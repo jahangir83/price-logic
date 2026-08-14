@@ -6,6 +6,8 @@ import { ShopifyResponseCache } from './response-cache';
 import { ShopifyAdminService } from './shopify-admin.service';
 import { ShopifyGraphQlClient } from './shopify-graphql.client';
 import { ThrottleRegistry } from './throttle';
+import { ShopifyClientFactory } from './shopify-client';
+import { WebhookRegistrarService } from './webhook-registrar.service';
 
 /**
  * The Shopify adapter layer.
@@ -23,7 +25,14 @@ import { ThrottleRegistry } from './throttle';
     ShopifyGraphQlClient,
     ShopifyResponseCache,
     ThrottleRegistry,
+    ShopifyClientFactory,
+    WebhookRegistrarService,
   ],
-  exports: [ShopifyAdminService, ShopifyResponseCache],
+  exports: [
+    ShopifyAdminService,
+    ShopifyResponseCache,
+    ShopifyClientFactory,
+    WebhookRegistrarService,
+  ],
 })
 export class ShopifyModule {}
