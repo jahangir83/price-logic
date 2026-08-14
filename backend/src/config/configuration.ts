@@ -15,6 +15,15 @@ export interface AppConfig {
   };
   encryptionKey: string;
   frontendUrl: string;
+  jobs: {
+    /** 'false' keeps the dispatcher dormant — used by the test suite. */
+    dispatcherEnabled: string;
+    pollIntervalMs: number;
+    /** Jobs one worker process runs at once. */
+    concurrency: number;
+    /** A RUNNING job untouched for this long is treated as an orphan. */
+    staleLockMs: number;
+  };
 }
 
 export default (): AppConfig => ({
@@ -34,4 +43,10 @@ export default (): AppConfig => ({
   },
   encryptionKey: process.env.ENCRYPTION_KEY as string,
   frontendUrl: process.env.FRONTEND_URL as string,
+  jobs: {
+    dispatcherEnabled: process.env.JOBS_DISPATCHER_ENABLED ?? 'true',
+    pollIntervalMs: parseInt(process.env.JOBS_POLL_INTERVAL_MS ?? '1000', 10),
+    concurrency: parseInt(process.env.JOBS_CONCURRENCY ?? '2', 10),
+    staleLockMs: parseInt(process.env.JOBS_STALE_LOCK_MS ?? '300000', 10),
+  },
 });
