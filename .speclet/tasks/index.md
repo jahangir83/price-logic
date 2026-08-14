@@ -30,6 +30,28 @@ Phases 3 and 5 are the two ways a campaign gets created and can be built in
 either order once Phase 2 exists. Phase 4 is shared by both and is the
 highest-risk component — the constitution requires full unit coverage on it.
 
+## Job execution & billing layer
+
+Source plan: `plans/12-jobs-billing.md`. Four phases (J1–J4) adding what the
+campaign schema has no representation of — execution attempts, retry state,
+concurrency, dependencies — plus plan limits and Shopify billing.
+
+- **J1. Job & Billing Schema** — seven tables folded into the unreleased
+  re-baseline migration
+- **J2. Job Engine & Dispatcher** — enqueue, dependencies, claiming,
+  lifecycle, pause/cancel, child jobs
+- **J3. Plan Limits, Usage & Overlap Resolution** — quota enforcement and the
+  two-campaigns-one-variant problem
+- **J4. Shopify Billing Integration** — subscriptions, webhooks, trials
+
+```
+MVP 1 (done) ──> J1 ──> J2 ──┬──> J3 ──> MVP 6 (activation)
+                              └──> J4 (blocked: needs a dev store)
+```
+
+J1 must land while the re-baseline migration is still unreleased. J2 and J3
+gate MVP Phase 6, the first phase that writes to Shopify.
+
 ## Shared type package (`packages/shared`)
 
 Built 2026-08-14, alongside Phase 1 rather than as a phase of its own.
