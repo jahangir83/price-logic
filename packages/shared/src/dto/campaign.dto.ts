@@ -5,7 +5,9 @@ import type {
   CampaignIncludeMode,
   CampaignPriceSource,
   CampaignStatus,
+  DuplicatePolicy,
 } from '../domain/campaign.js';
+import type { PriceEndingStrategy } from '../money/rounding.js';
 import type {
   CampaignTargetMode,
   CampaignTargetType,
@@ -33,8 +35,12 @@ export interface CreateCampaignRequest {
   adjustmentValue?: Money | null;
 
   basis?: CampaignBasis;
+  /** Null turns rounding off; it is the switch, not a missing value. */
   roundTo?: Money | null;
+  roundStrategy?: PriceEndingStrategy;
   setCompareAt?: boolean;
+  /** Null means "use the shop's global setting". */
+  duplicatePolicy?: DuplicatePolicy | null;
 
   includeMode?: CampaignIncludeMode;
   excludeDraftArchived?: boolean;
