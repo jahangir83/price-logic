@@ -14,6 +14,7 @@ import { ImportsModule } from './modules/imports/imports.module';
 import { CampaignsModule } from './modules/campaigns/campaigns.module';
 import { JobsModule } from './modules/jobs/jobs.module';
 import { BillingModule } from './modules/billing/billing.module';
+import { ShopifyModule } from './modules/shopify/shopify.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { BillingModule } from './modules/billing/billing.module';
     CampaignsModule,
     JobsModule,
     BillingModule,
+    ShopifyModule,
   ],
   controllers: [AppController],
 })
