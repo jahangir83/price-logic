@@ -112,6 +112,17 @@ that the 2026-08-12 redesign replaced. Kept as history — do not implement.
 - `tasks/phase-13-security-hardening.md` → folded into MVP Phase 8
 - `tasks/phase-14-reliability-testing-launch-readiness.md` → folded into MVP Phase 8
 
+## Install, boot and authentication
+
+Not from a plan document — the gap found once every phase was built: nothing
+subscribed to the webhook handlers, and the frontend rendered before knowing
+whether the shop was installed.
+
+- **Install & boot flow** — **Complete** (unverified against a real store) →
+  `tasks/install-boot-flow.md`
+- **App Bridge session token auth** — **Complete** (unverified against a real
+  store) → `tasks/session-token-auth.md`
+
 ## Documentation debt
 
 - `plans/07-database.md` — **resolved 2026-08-14.** Marked superseded; the

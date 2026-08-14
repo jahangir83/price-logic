@@ -17,7 +17,9 @@ import type { AuthenticatedRequest } from './authenticated-request';
  * act on Shop B's data by passing a different id).
  *
  * Runs SessionAuthGuard first (step 1: Authenticated?) so it can be used
- * standalone via `@UseGuards(ShopGuard)`.
+ * standalone via `@UseGuards(ShopGuard)`. That guard accepts either an App
+ * Bridge session token or the session cookie; by the time this one runs, the
+ * difference no longer matters — there is a shopId either way.
  *
  * Step 4 (Allowed Action?) is a no-op extension point for now — the MVP
  * domain has no per-user roles/permissions yet, so every authenticated
@@ -31,7 +33,7 @@ export class ShopGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    this.sessionAuthGuard.canActivate(context);
+    await this.sessionAuthGuard.canActivate(context);
 
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const shopId = request.session?.shopId;
@@ -39,7 +41,12 @@ export class ShopGuard implements CanActivate {
       throw new UnauthorizedException('No session');
     }
 
-    const shop = await this.shopsService.findById(shopId);
+    // Reuse the row SessionAuthGuard already loaded on the session-token path,
+    // but only after confirming it is the shop the session actually names.
+    const shop =
+      request.resolvedShop?.id === shopId
+        ? request.resolvedShop
+        : await this.shopsService.findById(shopId);
     if (!shop) {
       throw new UnauthorizedException('Shop no longer exists');
     }

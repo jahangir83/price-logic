@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { SessionService } from './session.service';
+import { ShopifySessionTokenService } from './shopify-session-token.service';
 
 @Module({
   imports: [
@@ -13,7 +14,7 @@ import { SessionService } from './session.service';
       }),
     }),
   ],
-  providers: [SessionService],
-  exports: [SessionService],
+  providers: [SessionService, ShopifySessionTokenService],
+  exports: [SessionService, ShopifySessionTokenService],
 })
 export class SessionModule {}
