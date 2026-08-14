@@ -75,6 +75,22 @@ still UP, so a 20% discount landing on `11.00` becomes `11.99` — worth
 revisiting with a merchant in front of it, but it is now a setting rather than
 a limitation.
 
+## Deferred — after MVP
+
+- **Volume discounts** and **countdown timers**. Two of the four pricing tiers
+  are differentiated by them (1/10/30/unlimited and 1/5/100/unlimited), so the
+  pricing page cannot advertise those tiers honestly until they exist.
+  Confirmed 2026-08-14 as post-MVP: build the bulk price editor first, add
+  these after.
+
+  Neither has any schema. Volume discounts are quantity breaks, which on
+  Shopify means a Discount Function — a different mechanism from writing
+  variant prices, not an extension of it. Countdown timers need a theme app
+  extension plus per-campaign timer config. Each is its own phase.
+
+  `app_plans.active_campaign_limit` already exists and is the natural place to
+  cap them once campaign types are introduced.
+
 ## Still valid from the previous plan
 
 - **Shopify App Shell & Tenant Foundation** → `tasks/phase-01-shopify-app-shell-tenant-foundation.md` — **Complete.** OAuth, session storage, encrypted tokens, the `shops` table and the tenant-scoping pattern all carry over unchanged.
