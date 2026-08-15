@@ -13,6 +13,8 @@ export interface DefaultSettings {
 export interface StoreInitStatus {
   initializationStatus: InitializationStatus;
   defaultSettings: DefaultSettings;
+  /** The shop's own currency — the only authority on how to format money here. */
+  currency: string;
 }
 
 export function getStoreInitStatus(): Promise<StoreInitStatus> {

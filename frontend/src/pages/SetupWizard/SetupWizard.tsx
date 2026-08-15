@@ -20,7 +20,16 @@ const STEP_LABELS: Record<WizardStep, string> = {
   finish: 'Finish',
 };
 
-export function SetupWizard() {
+interface SetupWizardProps {
+  /**
+   * Where finishing leads. Optional so the wizard still stands on its own —
+   * without it the merchant gets a confirmation and stops there, which is the
+   * right ending for a wizard rendered with nowhere to go.
+   */
+  onFinished?: () => void;
+}
+
+export function SetupWizard({ onFinished }: SetupWizardProps = {}) {
   const [stepIndex, setStepIndex] = useState(0);
   const [settings, setSettings] = useState<DefaultSettings>({});
   const [isFinished, setIsFinished] = useState(false);
@@ -108,7 +117,10 @@ export function SetupWizard() {
           />
         )}
         {currentStep === 'finish' && (
-          <FinishStep onBack={goBack} onFinished={() => setIsFinished(true)} />
+          <FinishStep
+            onBack={goBack}
+            onFinished={() => (onFinished ? onFinished() : setIsFinished(true))}
+          />
         )}
       </BlockStack>
     </Page>

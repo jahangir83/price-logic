@@ -9,3 +9,14 @@ body {
 #root {
   min-height: 100svh;
 }
+
+/*
+ * The App Bridge script defines `ui-nav-menu` and moves its links into the
+ * admin's own sidebar, leaving nothing to draw here. Outside the admin the
+ * script never loads, the element stays undefined, and an undefined custom
+ * element is an inline box that renders its children — a row of bare links
+ * sitting on top of a Polaris page. Hidden until it is real.
+ */
+ui-nav-menu:not(:defined) {
+  display: none;
+}

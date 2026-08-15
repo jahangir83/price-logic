@@ -10,11 +10,21 @@ import { StoreInitService } from './store-init.service';
 export class StoreInitController {
   constructor(private readonly storeInitService: StoreInitService) {}
 
+  /**
+   * What the app needs to know about this shop before it can render anything.
+   *
+   * `currency` is here because every screen that shows money needs it and the
+   * client must not guess: a price formatted as USD when the shop trades in JPY
+   * is wrong by a factor of a hundred, and the shop's own currency is the only
+   * authority on that. It comes from the shop record rather than the request so
+   * a client cannot ask to be told a different one.
+   */
   @Get('status')
   getStatus(@CurrentShop() shop: Shop) {
     return {
       initializationStatus: shop.initializationStatus,
       defaultSettings: shop.defaultSettings,
+      currency: shop.currency,
     };
   }
 

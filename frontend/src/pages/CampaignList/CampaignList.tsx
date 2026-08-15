@@ -23,7 +23,13 @@ import { ApiError } from '../../api/client';
 import { listCampaigns } from '../../api/campaigns';
 
 interface CampaignListProps {
-  onOpen?: (campaignId: string) => void;
+  /**
+   * Hands over the whole campaign, not just its id: a campaign that has not run
+   * yet opens onto a different screen than one that has, and the row already
+   * knows which this is. An id alone would make the caller fetch back what was
+   * on screen a moment ago.
+   */
+  onOpen?: (campaign: CampaignDto) => void;
   onCreate?: () => void;
   pageSize?: number;
 }
@@ -131,7 +137,7 @@ export function CampaignList({
                   id={campaign.id}
                   key={campaign.id}
                   position={index}
-                  onClick={() => onOpen?.(campaign.id)}
+                  onClick={() => onOpen?.(campaign)}
                 >
                   <IndexTable.Cell>
                     <Text as="span" fontWeight="semibold">
