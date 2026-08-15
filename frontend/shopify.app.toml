@@ -1,0 +1,45 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+#
+# Two hosts are in play and they are not interchangeable:
+#
+#   frontend-j.charming-wood.xyz -> Vite, port 3000. What Shopify frames.
+#   backend-j.charming-wood.xyz  -> NestJS, port 3001, all routes under /api.
+#                                   OAuth callback, webhooks, billing return.
+#
+# Push changes with `shopify app deploy`; the Partner Dashboard mirrors this
+# file rather than the other way round.
+
+client_id = "6ba0be0297ed29ef3373d5e4271d7136"
+name = "PriceLogic-dev"
+application_url = "https://frontend-j.charming-wood.xyz"
+embedded = true
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+# Must stay in step with SHOPIFY_SCOPES in backend/.env — the backend sends its
+# own copy to Shopify during OAuth, and a mismatch reprompts on every load.
+scopes = "read_products,write_products"
+
+[auth]
+redirect_urls = [ "https://backend-j.charming-wood.xyz/api/auth/callback" ]
+
+[webhooks]
+# Matches SHOPIFY_API_VERSION in backend/.env, so webhook payloads arrive in the
+# same shape as the API responses the handlers were written against. 2026-07 is
+# the current stable release; 2026-10 is still a release candidate.
+api_version = "2026-07"
+
+  # The three mandatory privacy webhooks. These can only be declared here —
+  # Shopify rejects them from webhookSubscriptionCreate, so unlike the business
+  # webhooks they are not registered per-install at OAuth time.
+  [webhooks.privacy_compliance]
+  customer_data_request_url = "https://backend-j.charming-wood.xyz/api/webhooks/customers/data-request"
+  customer_deletion_url = "https://backend-j.charming-wood.xyz/api/webhooks/customers/redact"
+  shop_deletion_url = "https://backend-j.charming-wood.xyz/api/webhooks/shop/redact"
+
+[build]
+# Off on purpose. The tunnels above are named and stable; letting the CLI
+# rewrite application_url and redirect_urls with a throwaway trycloudflare
+# address on every `shopify app dev` breaks OAuth until someone notices.
+automatically_update_urls_on_dev = false
+include_config_on_deploy = true

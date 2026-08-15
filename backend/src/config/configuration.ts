@@ -6,6 +6,14 @@ export interface AppConfig {
     apiKey: string;
     clientSecret: string;
     scopes: string;
+    /**
+     * The **backend's** public origin, including the global `api` prefix.
+     *
+     * Despite the Shopify-flavoured name, every URL built from it is a route
+     * this server answers: the OAuth callback, the webhook endpoints and the
+     * billing return. It is *not* the app's `application_url` — that is the
+     * frontend, and lives in `frontendUrl`.
+     */
     appUrl: string;
     apiVersion: string;
   };
@@ -44,6 +52,17 @@ export interface AppConfig {
   };
 }
 
+/**
+ * An origin with any trailing slashes removed.
+ *
+ * Both URLs below are only ever used as a prefix — `${appUrl}/auth/callback`,
+ * or an exact-match CORS origin. A trailing slash breaks both, and breaks them
+ * quietly: the redirect URI stops matching the one registered with Shopify, and
+ * the CORS check fails because a browser's `Origin` header never has one.
+ */
+const origin = (value: string | undefined): string =>
+  (value ?? '').replace(/\/+$/, '');
+
 export default (): AppConfig => ({
   nodeEnv: process.env.NODE_ENV ?? 'development',
   port: parseInt(process.env.PORT ?? '3000', 10),
@@ -52,15 +71,15 @@ export default (): AppConfig => ({
     apiKey: process.env.SHOPIFY_API_KEY as string,
     clientSecret: process.env.SHOPIFY_CLIENT_SECRET as string,
     scopes: process.env.SHOPIFY_SCOPES as string,
-    appUrl: process.env.SHOPIFY_APP_URL as string,
-    apiVersion: process.env.SHOPIFY_API_VERSION ?? '2025-01',
+    appUrl: origin(process.env.SHOPIFY_APP_URL),
+    apiVersion: process.env.SHOPIFY_API_VERSION ?? '2026-07',
   },
   session: {
     secret: process.env.SESSION_SECRET as string,
     ttlDays: parseInt(process.env.SESSION_TTL_DAYS ?? '7', 10),
   },
   encryptionKey: process.env.ENCRYPTION_KEY as string,
-  frontendUrl: process.env.FRONTEND_URL as string,
+  frontendUrl: origin(process.env.FRONTEND_URL),
   uploads: {
     dir: process.env.UPLOADS_DIR ?? `${process.cwd()}/../uploads`,
   },

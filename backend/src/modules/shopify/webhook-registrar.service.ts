@@ -14,6 +14,14 @@ import { ShopifyGraphQlClient } from './shopify-graphql.client';
  * not arrive.
  *
  * The paths must match `WebhooksController` exactly.
+ *
+ * Shopify's three mandatory privacy topics — `CUSTOMERS_DATA_REQUEST`,
+ * `CUSTOMERS_REDACT`, `SHOP_REDACT` — are deliberately absent. They are app
+ * settings rather than per-shop subscriptions, declared in
+ * `[webhooks.privacy_compliance]` in `shopify.app.toml`, and Shopify rejects
+ * them from `webhookSubscriptionCreate`. Listing them here would fail on every
+ * install while the handlers in `WebhooksController` carried on working, which
+ * reads as a broken integration and is not one.
  */
 const TOPICS: readonly { topic: string; path: string }[] = [
   { topic: 'APP_UNINSTALLED', path: '/webhooks/app-uninstalled' },
@@ -21,10 +29,6 @@ const TOPICS: readonly { topic: string; path: string }[] = [
     topic: 'APP_SUBSCRIPTIONS_UPDATE',
     path: '/webhooks/app-subscriptions-update',
   },
-  // Shopify's three mandatory privacy topics. Missing any one fails review.
-  { topic: 'CUSTOMERS_DATA_REQUEST', path: '/webhooks/customers/data-request' },
-  { topic: 'CUSTOMERS_REDACT', path: '/webhooks/customers/redact' },
-  { topic: 'SHOP_REDACT', path: '/webhooks/shop/redact' },
 ];
 
 export interface WebhookRegistrationResult {

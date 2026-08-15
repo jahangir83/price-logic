@@ -58,8 +58,8 @@ describe('ShopifyAuthService', () => {
     webhookRegistrar = {
       registerAll: jest.fn(() =>
         Promise.resolve({
-          total: 5,
-          registered: 5,
+          total: 2,
+          registered: 2,
           alreadyPresent: 0,
           failed: [],
         }),

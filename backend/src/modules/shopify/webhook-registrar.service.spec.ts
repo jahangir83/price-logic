@@ -80,10 +80,13 @@ describe('WebhookRegistrarService', () => {
     expect(topics).toEqual([...WebhookRegistrarService.topics()]);
   });
 
-  it("includes Shopify's three mandatory privacy topics", () => {
-    // Missing any one of these is an automatic app-review rejection, so the
-    // list is asserted rather than left to a reviewer to notice.
-    expect(WebhookRegistrarService.topics()).toEqual(
+  it("leaves Shopify's three mandatory privacy topics to app config", () => {
+    // These are app settings, not per-shop subscriptions: they are declared in
+    // `[webhooks.privacy_compliance]` in shopify.app.toml, and Shopify rejects
+    // them from webhookSubscriptionCreate. Subscribing to them here would fail
+    // on every single install without breaking anything, which is the worst
+    // kind of failure — noisy, permanent, and not actually a symptom.
+    expect(WebhookRegistrarService.topics()).not.toEqual(
       expect.arrayContaining([
         'CUSTOMERS_DATA_REQUEST',
         'CUSTOMERS_REDACT',

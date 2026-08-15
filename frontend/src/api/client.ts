@@ -2,9 +2,19 @@ import type { ApiErrorResponse } from '@pricelogic/shared';
 import { reauthenticate } from '../bootstrap/reauthenticate';
 import { canUseSessionToken, getSessionToken } from './session-token';
 
-/** Origin of the backend. Exported because the boot sequence needs to build a
- * top-frame OAuth URL, which is a navigation rather than a fetch. */
-export const API_URL = import.meta.env.VITE_API_URL as string;
+/**
+ * Origin of the backend, including its `api` prefix. Exported because the boot
+ * sequence needs to build a top-frame OAuth URL, which is a navigation rather
+ * than a fetch.
+ *
+ * Trailing slashes are stripped: every use is `${API_URL}${path}` with a path
+ * that already starts with `/`, and `//store/check-installation` is a different
+ * URL that no route answers.
+ */
+export const API_URL = ((import.meta.env.VITE_API_URL as string) ?? '').replace(
+  /\/+$/,
+  '',
+);
 
 /** The backend's answer when a shop has no install left to authenticate against. */
 export const APP_NOT_INSTALLED = 'APP_NOT_INSTALLED';
