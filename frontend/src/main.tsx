@@ -1,4 +1,5 @@
 import { checkInstallation } from './bootstrap/checkInstallation';
+import { ensureEmbedded } from './bootstrap/embed';
 import { cacheInstalled, readInstallCache } from './bootstrap/installCache';
 import { loadAppBridge } from './bootstrap/loadAppBridge';
 import { renderMissingShop, renderRoot } from './bootstrap/renderRoot';
@@ -16,7 +17,11 @@ import { API_URL } from './api/client';
  *  installed?  ──no──▶ top-frame redirect to backend /auth ──▶ Shopify OAuth
  *      │yes                                                        │
  *      ▼                                                     callback stores
- *  load App Bridge ──▶ render React                          token + session
+ *  in a frame? ──no──▶ redirect into the admin ──┐            token + session
+ *      │yes                                      │                 │
+ *      │       ┌── Shopify frames the app ◀──────┘◀────────────────┘
+ *      ▼       ▼
+ *  load App Bridge ──▶ render React
  * ```
  *
  * The ordering is the whole point, and each step has to finish before the next:
@@ -24,6 +29,8 @@ import { API_URL } from './api/client';
  * - **Install check before anything else.** Rendering first and discovering the
  *   401s later gives the merchant a flash of broken UI, and an OAuth redirect
  *   fired from a mounted React tree throws away whatever it was doing.
+ * - **Re-embed before App Bridge.** App Bridge reaches the admin through the
+ *   parent frame; started on a top-level page it has nothing to talk to.
  * - **App Bridge before React.** It is read from the global when a component
  *   mounts, so a late load means the first render sees a window without it.
  *
@@ -50,7 +57,7 @@ async function boot(): Promise<void> {
 
   // The returning-merchant path: skip the round trip entirely.
   if (readInstallCache(shop)) {
-    await start();
+    await start(shop, host);
     return;
   }
 
@@ -64,11 +71,21 @@ async function boot(): Promise<void> {
   }
 
   cacheInstalled(shop);
-  await start();
+  await start(shop, host);
 }
 
-async function start(): Promise<void> {
-  await loadAppBridge(import.meta.env.VITE_SHOPIFY_API_KEY as string | undefined);
+async function start(shop: string, host: string | null): Promise<void> {
+  const apiKey = import.meta.env.VITE_SHOPIFY_API_KEY as string | undefined;
+
+  // The OAuth callback drops the merchant on a top-level page, because that is
+  // where OAuth had to happen. Loading App Bridge here would be pointless — it
+  // reaches the admin through the parent frame, and there isn't one — so the
+  // page hands itself back to Shopify and gets framed properly. Checked after
+  // the install gate: re-embedding a shop that still needs OAuth just puts the
+  // breakout back where it started.
+  if (ensureEmbedded({ shop, host }, apiKey)) return;
+
+  await loadAppBridge(apiKey);
   renderRoot();
 }
 
