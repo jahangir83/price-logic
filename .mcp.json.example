@@ -1,0 +1,24 @@
+{
+  "_comment": [
+    "Copy to .mcp.json and put your own connection string in, matching the",
+    "DATABASE_URL in backend/.env. The real file is gitignored because this",
+    "server takes the password as a command-line argument.",
+    "",
+    "Read-only: the server opens every statement in a read-only transaction,",
+    "so an INSERT or UPDATE comes back as an error rather than changing data.",
+    "It exposes one tool, `query`, plus each table's schema as a resource.",
+    "",
+    "Note: @modelcontextprotocol/server-postgres is deprecated upstream and",
+    "pinned at 0.6.2. It works, but it will not be getting fixes."
+  ],
+  "mcpServers": {
+    "price-logic-postgres": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "postgresql://USER:PASSWORD@localhost:5432/pricelogic_dev"
+      ]
+    }
+  }
+}

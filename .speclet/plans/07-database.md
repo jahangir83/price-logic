@@ -1,5 +1,15 @@
 # 07 - Database Design
 
+> **SUPERSEDED — do not implement from this document.**
+>
+> This describes the 17-table schema that mirrored the Shopify catalog and
+> modelled suppliers, costs, margins and pricing rules as separate concerns.
+> The 2026-08-12 re-baseline replaced it, and its tables are dropped by
+> `1786550000000-CampaignSupplierMvpRebaseline.ts`.
+>
+> **The schema as built is documented in `13-database-map.md`.** This file is
+> kept as history — it records the reasoning that led to the redesign.
+
 **Product:** PriceLogic
 **Company:** We Solve X Tech
 **Document Type:** Database Specification

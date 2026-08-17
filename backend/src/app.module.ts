@@ -7,17 +7,15 @@ import { AppController } from './app.controller';
 import { AuthModule } from './common/auth/auth.module';
 import { ShopifyAuthModule } from './modules/shopify-auth/shopify-auth.module';
 import { ShopsModule } from './modules/shops/shops.module';
+import { SettingsModule } from './modules/settings/settings.module';
 import { StoreInitModule } from './modules/store-init/store-init.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
-import { ProductsModule } from './modules/products/products.module';
 import { SuppliersModule } from './modules/suppliers/suppliers.module';
 import { ImportsModule } from './modules/imports/imports.module';
-import { PricingRulesModule } from './modules/pricing-rules/pricing-rules.module';
-import { PricingOperationsModule } from './modules/pricing-operations/pricing-operations.module';
-import { PriceHistoryModule } from './modules/price-history/price-history.module';
 import { CampaignsModule } from './modules/campaigns/campaigns.module';
-import { SchedulesModule } from './modules/schedules/schedules.module';
-import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
+import { JobsModule } from './modules/jobs/jobs.module';
+import { BillingModule } from './modules/billing/billing.module';
+import { ShopifyModule } from './modules/shopify/shopify.module';
 
 @Module({
   imports: [
@@ -41,17 +39,15 @@ import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
     AuthModule,
     ShopsModule,
     ShopifyAuthModule,
+    SettingsModule,
     StoreInitModule,
     WebhooksModule,
-    ProductsModule,
     SuppliersModule,
     ImportsModule,
-    PricingRulesModule,
-    PricingOperationsModule,
-    PriceHistoryModule,
     CampaignsModule,
-    SchedulesModule,
-    AuditLogsModule,
+    JobsModule,
+    BillingModule,
+    ShopifyModule,
   ],
   controllers: [AppController],
 })

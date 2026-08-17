@@ -1,0 +1,22 @@
+
+
+
+Database design should be easy,
+Note: everything from shopify > shopify is truth or source
+Note: Our system just store merchant selected products and variants, collections, and price changes variant store example `id:composite (campaignId _ variantsId), productID:shopify, variantsId, old_price, old_compared_price, new price, is reverted:boolean, isProcess`, when we need to revert, 
+
+I just some table clearence to you, 
+
+campaignTable: `id, title, startTime, startTimeZone, endTime, endTimeZone, addTags:[], removeTags:[],, Status:[schedule, pending, processing],`
+we have include and exclude table
+include is relation with (collection, products, campaign)
+exclude is same,
+
+
+product table only usere selected product where from merchant and this tabe relation with include and exclude, 
+collection table same as product,
+
+
+price change table above the note,
+product_tag table `campaignId, productsId, oldTags, new Tags, isReverted: isProcess`
+

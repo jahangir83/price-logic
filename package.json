@@ -1,0 +1,23 @@
+{
+  "name": "pricelogic",
+  "version": "0.0.0",
+  "description": "PriceLogic — Shopify bulk pricing and supplier-sheet app.",
+  "license": "UNLICENSED",
+  "private": true,
+  "comments": {
+    "no-workspaces": "backend, frontend and packages/shared install independently, each with its own lockfile. npm workspaces would give a single root lockfile, but converting requires re-resolving typeorm's ~30 optional peer drivers from scratch, which this machine does not have the memory to complete. The apps depend on the shared package through 'file:../packages/shared', which npm symlinks — the developer experience is the same.",
+    "build-order": "packages/shared must be built before the apps typecheck or test; they consume its dist/, not its src/."
+  },
+  "scripts": {
+    "setup": "npm --prefix packages/shared install && npm --prefix packages/shared run build && npm --prefix backend install && npm --prefix frontend install",
+    "build": "npm run build:shared && npm --prefix backend run build && npm --prefix frontend run build",
+    "build:shared": "npm --prefix packages/shared run build",
+    "test": "npm run build:shared && npm --prefix packages/shared test && npm --prefix backend test",
+    "test:shared": "npm --prefix packages/shared test",
+    "lint": "npm --prefix backend run lint && npm --prefix frontend run lint",
+    "dev:api": "npm --prefix backend run start:dev",
+    "dev:ui": "npm --prefix frontend run dev",
+    "migration:run": "npm --prefix backend run migration:run",
+    "migration:revert": "npm --prefix backend run migration:revert"
+  }
+}
