@@ -52,6 +52,28 @@ export function changeCampaignStatus(
   });
 }
 
+/** What an activate or deactivate request hands back: a job to watch. */
+export interface CampaignJobRef {
+  jobId: string;
+  campaignId: string;
+}
+
+/**
+ * Start a campaign.
+ *
+ * Returns as soon as the job is queued, not when prices are live — applying a
+ * campaign is minutes of work against Shopify, so the screen follows the job
+ * rather than waiting on the request.
+ */
+export function activateCampaign(id: string): Promise<CampaignJobRef> {
+  return apiFetch(`/campaigns/${id}/activate`, { method: 'POST' });
+}
+
+/** End a campaign early, putting every price it changed back. */
+export function deactivateCampaign(id: string): Promise<CampaignJobRef> {
+  return apiFetch(`/campaigns/${id}/deactivate`, { method: 'POST' });
+}
+
 export function listTargets(id: string): Promise<{
   targets: CampaignTargetDto[];
   counts: Record<CampaignTargetMode, number>;

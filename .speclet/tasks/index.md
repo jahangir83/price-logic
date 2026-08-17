@@ -50,6 +50,16 @@ before launch is not more phases — it is a development store, webhook
 registration at install, and confirming the pinned API version. See
 `plans/14-launch-readiness.md`.
 
+- **Multi-step jobs & Shopify bulk operations** — **Complete** (unverified
+  against a real store) → `tasks/bulk-operations-job-steps.md`
+
+  Added 2026-08-16, after J1–J4. A step now records what it produced rather than
+  only where the job got to, and price writes of 500 variants or more go through
+  `bulkOperationRunMutation` in 5,000-variant chunks, with the job parking in
+  WAITING_BULK until `bulk_operations/finish` wakes it. Catalogue *reads* still
+  paginate rather than using `bulkOperationRunQuery` — see that file's "What is
+  not done".
+
 ## Shared type package (`packages/shared`)
 
 Built 2026-08-14, alongside Phase 1 rather than as a phase of its own.
@@ -122,6 +132,27 @@ whether the shop was installed.
   `tasks/install-boot-flow.md`
 - **App Bridge session token auth** — **Complete** (unverified against a real
   store) → `tasks/session-token-auth.md`
+
+## Onboarding
+
+Not from a plan document — a design change after the first real install: the
+five-step setup wizard gated an app that had nothing it actually needed asking.
+
+- **Optional setup, settings page and setup guide** — **Complete** →
+  `tasks/optional-setup-guide.md`
+- **Enforce the minimum price** — **Complete** →
+  `tasks/enforce-minimum-price.md`
+- **Supplier and sheet UI** — **Complete** (upload and parse verified against
+  the real database; SKU matching still needs a live store) →
+  `tasks/supplier-sheet-ui.md`
+- **The sheet, and what it is being compared against** — **Complete** (sort and
+  example sheet verified against the real database; product titles need a live
+  store to populate) → `tasks/sheet-comparison.md`
+- **Stock, and not repricing what cannot be sold** — **Complete** →
+  `tasks/out-of-stock-rows.md`
+- **The matching ladder** — **Complete** (rung order and short-circuiting
+  verified against the real database; barcode lookup needs a live store) →
+  `tasks/matching-ladder.md`
 
 ## Documentation debt
 

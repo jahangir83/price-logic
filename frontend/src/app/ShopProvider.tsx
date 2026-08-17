@@ -18,7 +18,6 @@ export function ShopProvider({
   children: ReactNode;
 }): ReactElement {
   const [state, setState] = useState<LoadState>({ phase: 'loading' });
-  const [setUpOverride, setSetUpOverride] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,11 +69,7 @@ export function ShopProvider({
 
   return (
     <ShopContext.Provider
-      value={{
-        currency: status.currency,
-        isSetUp: setUpOverride || status.initializationStatus === 'COMPLETE',
-        markSetUp: () => setSetUpOverride(true),
-      }}
+      value={{ currency: status.currency }}
     >
       {children}
     </ShopContext.Provider>

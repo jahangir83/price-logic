@@ -7,30 +7,33 @@ import {
   ShopifyProductStatus,
 } from '@pricelogic/shared';
 import { DataSource } from 'typeorm';
-import { BillingService } from '../src/modules/billing/billing.service';
+import { BillingService } from '../src/modules/billing/services/billing.service';
 import { AppPlan } from '../src/modules/billing/entities/app-plan.entity';
 import { StoreSubscriptionEvent } from '../src/modules/billing/entities/store-subscription-event.entity';
 import { StoreSubscription } from '../src/modules/billing/entities/store-subscription.entity';
 import { StoreUsage } from '../src/modules/billing/entities/store-usage.entity';
-import { ActivationService } from '../src/modules/campaigns/activation.service';
-import { CampaignTargetsService } from '../src/modules/campaigns/campaign-targets.service';
-import { CampaignsService } from '../src/modules/campaigns/campaigns.service';
+import { ActivationService } from '../src/modules/campaigns/services/activation.service';
+import { CampaignTargetsService } from '../src/modules/campaigns/services/campaign-targets.service';
+import { CampaignsService } from '../src/modules/campaigns/services/campaigns.service';
 import { Campaign } from '../src/modules/campaigns/entities/campaign.entity';
 import { CampaignTarget } from '../src/modules/campaigns/entities/campaign-target.entity';
 import { PriceChange } from '../src/modules/campaigns/entities/price-change.entity';
 import { ProductTagChange } from '../src/modules/campaigns/entities/product-tag-change.entity';
-import { OverlapService } from '../src/modules/campaigns/overlap.service';
-import { CampaignPreviewService } from '../src/modules/campaigns/preview.service';
-import { TargetResolverService } from '../src/modules/campaigns/target-resolver.service';
+import { OverlapService } from '../src/modules/campaigns/services/overlap.service';
+import { CampaignPreviewService } from '../src/modules/campaigns/services/preview.service';
+import { TargetResolverService } from '../src/modules/campaigns/services/target-resolver.service';
 import { CsvRow } from '../src/modules/imports/entities/csv-row.entity';
 import { Job } from '../src/modules/jobs/entities/job.entity';
+import { JobStepResult } from '../src/modules/jobs/entities/job-step-result.entity';
 import { JobExecution } from '../src/modules/jobs/entities/job-execution.entity';
 import { JobDependency } from '../src/modules/jobs/entities/job-dependency.entity';
+import { JobsService } from '../src/modules/jobs/services/jobs.service';
+import { BulkOperationService } from '../src/modules/shopify/services/bulk-operation.service';
 import {
   ShopifyAdminService,
   type CatalogVariant,
   type VariantPriceUpdate,
-} from '../src/modules/shopify/shopify-admin.service';
+} from '../src/modules/shopify/services/shopify-admin.service';
 import { Shop } from '../src/modules/shops/entities/shop.entity';
 
 /**
@@ -69,7 +72,9 @@ describe('campaign activation', () => {
     sku: `SKU-${id}`,
     price,
     compareAtPrice: null,
+    barcode: null,
     productStatus: ShopifyProductStatus.ACTIVE,
+    inventoryQuantity: null,
     productTags: tags,
     productVendor: null,
     productType: null,
@@ -128,6 +133,7 @@ describe('campaign activation', () => {
             Job,
             JobExecution,
             JobDependency,
+            JobStepResult,
           ],
           synchronize: false,
         }),
@@ -147,7 +153,27 @@ describe('campaign activation', () => {
         TargetResolverService,
         OverlapService,
         BillingService,
+        JobsService,
         { provide: ShopifyAdminService, useValue: shopifyStub },
+        {
+          /*
+           * These campaigns are far below the bulk threshold, so every write
+           * must take the synchronous path. A stub that throws is the
+           * assertion: if the size switch ever sends a five-variant campaign
+           * through a bulk operation, these tests fail rather than quietly
+           * exercising a path they were never written for.
+           */
+          provide: BulkOperationService,
+          useValue: {
+            runMutation: () => {
+              throw new Error('A small campaign must not use a bulk operation');
+            },
+            findById: () => Promise.resolve(null),
+            readResults: async function* () {
+              // nothing
+            },
+          },
+        },
       ],
     }).compile();
 

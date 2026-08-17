@@ -7,7 +7,7 @@ import {
   SubscriptionStatus,
 } from '@pricelogic/shared';
 import { DataSource } from 'typeorm';
-import { BillingService } from '../src/modules/billing/billing.service';
+import { BillingService } from '../src/modules/billing/services/billing.service';
 import { AppPlan } from '../src/modules/billing/entities/app-plan.entity';
 import { StoreSubscriptionEvent } from '../src/modules/billing/entities/store-subscription-event.entity';
 import { StoreSubscription } from '../src/modules/billing/entities/store-subscription.entity';
@@ -16,7 +16,7 @@ import { Campaign } from '../src/modules/campaigns/entities/campaign.entity';
 import { CampaignTarget } from '../src/modules/campaigns/entities/campaign-target.entity';
 import { PriceChange } from '../src/modules/campaigns/entities/price-change.entity';
 import { ProductTagChange } from '../src/modules/campaigns/entities/product-tag-change.entity';
-import { OverlapService } from '../src/modules/campaigns/overlap.service';
+import { OverlapService } from '../src/modules/campaigns/services/overlap.service';
 import { PermanentJobError } from '../src/modules/jobs/job-handler';
 
 /**

@@ -8,16 +8,16 @@ import {
   SubscriptionStatus,
 } from '@pricelogic/shared';
 import { DataSource } from 'typeorm';
-import { BillingService } from '../src/modules/billing/billing.service';
+import { BillingService } from '../src/modules/billing/services/billing.service';
 import { AppPlan } from '../src/modules/billing/entities/app-plan.entity';
 import { StoreSubscriptionEvent } from '../src/modules/billing/entities/store-subscription-event.entity';
 import { StoreSubscription } from '../src/modules/billing/entities/store-subscription.entity';
 import { StoreUsage } from '../src/modules/billing/entities/store-usage.entity';
-import { SubscriptionsService } from '../src/modules/billing/subscriptions.service';
+import { SubscriptionsService } from '../src/modules/billing/services/subscriptions.service';
 import { Campaign } from '../src/modules/campaigns/entities/campaign.entity';
 import { PriceChange } from '../src/modules/campaigns/entities/price-change.entity';
 import { Job } from '../src/modules/jobs/entities/job.entity';
-import { ShopifyAdminService } from '../src/modules/shopify/shopify-admin.service';
+import { ShopifyAdminService } from '../src/modules/shopify/services/shopify-admin.service';
 import { Shop } from '../src/modules/shops/entities/shop.entity';
 
 /**

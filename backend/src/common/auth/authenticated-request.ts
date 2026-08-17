@@ -1,7 +1,7 @@
 import type { Request } from 'express';
 import type { Shop } from '../../modules/shops/entities/shop.entity';
-import type { SessionPayload } from '../../modules/session/session.service';
-import type { VerifiedSessionToken } from '../../modules/session/shopify-session-token.service';
+import type { SessionPayload } from '../../modules/session/services/session.service';
+import type { VerifiedSessionToken } from '../../modules/session/services/shopify-session-token.service';
 
 export interface AuthenticatedRequest extends Request {
   /** Set by SessionAuthGuard once the session cookie is verified. */

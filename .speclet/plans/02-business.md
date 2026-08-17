@@ -237,6 +237,10 @@ Therefore, pricing calculations must not assume that every variant of a product 
 
 # 8. Supplier Cost Workflow
 
+> **Superseded, 2026-08-16.** The MVP carries *final prices* in supplier
+> sheets, not costs — see §33. This section describes the cost-based design,
+> which remains a live option but is not what is built.
+
 One important PriceLogic workflow is supplier cost synchronization.
 
 The merchant receives supplier pricing data.
@@ -920,3 +924,128 @@ It is a system that helps merchants answer:
 > **"What should my product price be, and how can I change thousands of prices safely and efficiently?"**
 
 That is the core business problem PriceLogic exists to solve.
+
+---
+
+# 33. Supplier Sheet Import — the contract
+
+> Added 2026-08-16. Section 8 above describes a **cost-based** supplier
+> workflow. That is not what was built, and the difference is deliberate — see
+> "The cost question" below before treating §8 as current.
+
+## 33.1 What a supplier sheet carries today
+
+The sheet states **the price the merchant should sell at**, not what the
+merchant pays. `plans/11-campaign-supplier-mvp.md` §4 decided this explicitly:
+no cost, no margin, no markup rules. The campaign's own adjustment is what puts
+a markup on top, which is how "supplier's list plus 20%" is expressed.
+
+| Column | Required | Aliases accepted | Meaning |
+|---|---|---|---|
+| `sku` | yes | `variant_sku`, `item_number`, `item_code` | Matched against the Shopify variant SKU |
+| `price` | yes | `new_price`, `unit_price`, `selling_price` | The final selling price, before any campaign adjustment |
+| `compare_at_price` | no | `msrp`, `rrp`, `list_price` | Shown struck through beside the price |
+| `stock` | no | `quantity`, `qty`, `available`, `inventory`, `stock_level` | Supplier availability. Zero leaves the row alone |
+
+Header matching ignores case, spaces and underscores. The canonical list lives
+in `CSV_COLUMN_ALIASES` in `@pricelogic/shared`, and the downloadable example
+on the upload screen is generated from it, so neither can drift from the parser.
+
+## 33.2 Validation
+
+Per-row, never per-file. One bad line must not cost the merchant the other
+4,999.
+
+- Missing SKU, missing price, unparseable price, negative price, zero price →
+  the row is `INVALID` with a specific reason, and every other row continues.
+- A missing `sku` or `price` **column** is the one fatal error: that file is not
+  a supplier sheet.
+- `stock` never fails a row. It is optional, and a supplier writing "call us"
+  has still sent a usable price.
+- Currency symbols and thousands separators are stripped. `1.234,56` is
+  **rejected rather than guessed** — European and US conventions are ambiguous
+  at a glance and guessing wrong reprices a catalogue by a factor of a hundred.
+- Two rows for one SKU flag **both**. The last one does not win.
+
+## 33.3 Product matching
+
+Today: **SKU only**, exact match, via one Shopify GraphQL query per batch of
+SKUs. A SKU resolving to more than one variant is flagged, never guessed —
+repricing whichever Shopify returned first is exactly the invisible wrong
+answer the approval screen exists to prevent.
+
+**Built 2026-08-16**, rungs 1–3. A matching ladder, tried in order, each rung
+seeing only the rows every rung before it failed:
+
+1. **Merchant SKU** — the merchant's own SKU, when the supplier echoes it back.
+2. **Supplier SKU** — the supplier's code, via a stored per-supplier mapping.
+3. **Barcode / UPC / EAN** — the strongest identifier of the three, because it
+   is assigned by the manufacturer rather than by either party.
+4. **Manual mapping** — for the remainder, saved so it is answered once.
+   **Not built.** Needs a variant picker and a persisted per-supplier mapping,
+   which is a feature rather than a rung.
+
+Which rung answered is recorded on the row and shown in the review, because the
+rungs are not equally trustworthy: a barcode match means the merchant's own SKU
+did not match, and that is worth a second look before approving.
+
+## 33.4 Supplier column profiles
+
+**Not built.** A supplier who titles their column "Unit Price" every month
+should be mapped once, not re-mapped every month. Stored per supplier, so the
+mapping is a property of who sent the file rather than of the file.
+
+This extends the existing alias system rather than replacing it: aliases handle
+what is common across suppliers, a profile handles what is peculiar to one.
+
+## 33.5 The flow, as built
+
+```
+upload → parse (job) → match against Shopify (job) → review → approve
+      → campaign created → preview → activate → Shopify updated
+```
+
+Parse and match are separate jobs on purpose: parsing is local and fast,
+matching calls Shopify and can be throttled for minutes. Splitting them means a
+rate limit never forces a re-parse.
+
+Out-of-stock rows are skipped at activation on **live** stock, not on the stock
+recorded at match time — a sheet approved a week after it was matched must not
+act on a week-old count.
+
+## 33.6 The cost question
+
+An independent review (2026-08-16) recommended a cost-based format —
+`supplier_sku, product_name, cost_price, currency, stock_qty, barcode` — with
+cost-change detection driving pricing rules. That is not a new idea: it is
+§8 of this very document, which the MVP superseded.
+
+Both designs are defensible. What matters is that the difference is not a
+column:
+
+- **Final-price sheets** (built) — the supplier states the answer. Simple,
+  works today, and cannot compute a margin because it never knows a cost.
+- **Cost-price sheets** (§8) — the supplier states the input. Enables margin
+  floors, "price = cost × 1.4" rules, and profitability reporting. Requires
+  cost storage and history, cost-change detection, margin rules in the price
+  calculator, and currency conversion when the supplier bills in another
+  currency.
+
+`minimumMarginPercent` already exists as a setting and is **stored but not
+enforced**, precisely because there is no cost to compute a margin against.
+That field is the seam where this decision lands.
+
+**This is an open product decision, not a backlog item.** Adopting cost pricing
+touches the money paths, which is the most sensitive code in the system, so it
+should be taken deliberately and as its own phase — not folded into an import
+change.
+
+## 33.7 Fields deliberately not adopted
+
+`MOQ`, `lead time`, `brand`, `category` and `last updated` are all real columns
+on real supplier sheets, and none of them change a price. They are ignored
+rather than stored: a field nothing reads is a field that goes stale and is
+then trusted anyway.
+
+`currency` is a special case — harmless while sheets carry final prices in the
+shop's own currency, and load-bearing the moment costs arrive in another.

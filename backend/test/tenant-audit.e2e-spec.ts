@@ -3,28 +3,29 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CsvRowStatus } from '@pricelogic/shared';
 import { DataSource } from 'typeorm';
-import { BillingService } from '../src/modules/billing/billing.service';
+import { BillingService } from '../src/modules/billing/services/billing.service';
 import { AppPlan } from '../src/modules/billing/entities/app-plan.entity';
 import { StoreSubscriptionEvent } from '../src/modules/billing/entities/store-subscription-event.entity';
 import { StoreSubscription } from '../src/modules/billing/entities/store-subscription.entity';
 import { StoreUsage } from '../src/modules/billing/entities/store-usage.entity';
-import { CampaignTargetsService } from '../src/modules/campaigns/campaign-targets.service';
-import { CampaignsService } from '../src/modules/campaigns/campaigns.service';
+import { CampaignTargetsService } from '../src/modules/campaigns/services/campaign-targets.service';
+import { CampaignsService } from '../src/modules/campaigns/services/campaigns.service';
 import { Campaign } from '../src/modules/campaigns/entities/campaign.entity';
 import { CampaignTarget } from '../src/modules/campaigns/entities/campaign-target.entity';
 import { PriceChange } from '../src/modules/campaigns/entities/price-change.entity';
 import { ProductTagChange } from '../src/modules/campaigns/entities/product-tag-change.entity';
 import { CsvImport } from '../src/modules/imports/entities/csv-import.entity';
 import { CsvRow } from '../src/modules/imports/entities/csv-row.entity';
-import { ImportsService } from '../src/modules/imports/imports.service';
+import { ImportsService } from '../src/modules/imports/services/imports.service';
 import { JobDependency } from '../src/modules/jobs/entities/job-dependency.entity';
 import { JobExecution } from '../src/modules/jobs/entities/job-execution.entity';
 import { Job } from '../src/modules/jobs/entities/job.entity';
-import { JobsService } from '../src/modules/jobs/jobs.service';
-import { ShopifyAdminService } from '../src/modules/shopify/shopify-admin.service';
+import { JobStepResult } from '../src/modules/jobs/entities/job-step-result.entity';
+import { JobsService } from '../src/modules/jobs/services/jobs.service';
+import { ShopifyAdminService } from '../src/modules/shopify/services/shopify-admin.service';
 import { Shop } from '../src/modules/shops/entities/shop.entity';
 import { Supplier } from '../src/modules/suppliers/entities/supplier.entity';
-import { SuppliersService } from '../src/modules/suppliers/suppliers.service';
+import { SuppliersService } from '../src/modules/suppliers/services/suppliers.service';
 
 /**
  * Shop A trying to read shop B, resource by resource.
@@ -77,6 +78,7 @@ describe('tenant isolation across every resource', () => {
             Job,
             JobExecution,
             JobDependency,
+            JobStepResult,
             AppPlan,
             StoreSubscription,
             StoreSubscriptionEvent,

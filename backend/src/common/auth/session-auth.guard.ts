@@ -7,9 +7,9 @@ import {
 import {
   SESSION_COOKIE_NAME,
   SessionService,
-} from '../../modules/session/session.service';
-import { ShopifySessionTokenService } from '../../modules/session/shopify-session-token.service';
-import { ShopsService } from '../../modules/shops/shops.service';
+} from '../../modules/session/services/session.service';
+import { ShopifySessionTokenService } from '../../modules/session/services/shopify-session-token.service';
+import { ShopsService } from '../../modules/shops/services/shops.service';
 import type { AuthenticatedRequest } from './authenticated-request';
 
 /**

@@ -49,6 +49,11 @@ export interface AppConfig {
     concurrency: number;
     /** A RUNNING job untouched for this long is treated as an orphan. */
     staleLockMs: number;
+    /**
+     * How often to check Shopify for bulk operations whose finish webhook
+     * never arrived. A backstop, not the mechanism.
+     */
+    bulkSweepMs: number;
   };
 }
 
@@ -96,5 +101,6 @@ export default (): AppConfig => ({
     pollIntervalMs: parseInt(process.env.JOBS_POLL_INTERVAL_MS ?? '1000', 10),
     concurrency: parseInt(process.env.JOBS_CONCURRENCY ?? '2', 10),
     staleLockMs: parseInt(process.env.JOBS_STALE_LOCK_MS ?? '300000', 10),
+    bulkSweepMs: parseInt(process.env.JOBS_BULK_SWEEP_MS ?? '60000', 10),
   },
 });

@@ -8,7 +8,7 @@ import {
   type JobContext,
 } from '../jobs/job-handler';
 import { Shop } from '../shops/entities/shop.entity';
-import { ImportsService } from './imports.service';
+import { ImportsService } from './services/imports.service';
 
 /**
  * The first real job handlers.

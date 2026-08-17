@@ -15,10 +15,6 @@ import { createContext, useContext } from 'react';
  */
 export interface ShopContextValue {
   currency: string;
-  /** Whether the merchant has been through the setup wizard. */
-  isSetUp: boolean;
-  /** Lets the wizard flip the gate without a second round trip. */
-  markSetUp: () => void;
 }
 
 export const ShopContext = createContext<ShopContextValue | null>(null);

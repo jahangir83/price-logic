@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
-import { SessionService } from './session.service';
-import { ShopifySessionTokenService } from './shopify-session-token.service';
+import { SessionService } from './services/session.service';
+import { ShopifySessionTokenService } from './services/shopify-session-token.service';
 
 @Module({
   imports: [

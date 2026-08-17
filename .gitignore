@@ -33,3 +33,9 @@ lerna-debug.log*
 
 # Local agent settings
 .claude/settings.local.json
+
+# MCP server config. Ignored because the Postgres server takes its connection
+# string as a command-line argument, so the file holds a database password in
+# plaintext. Committing it would put that password in the repository's history,
+# where removing it later means a rewrite. Copy .mcp.json.example instead.
+.mcp.json

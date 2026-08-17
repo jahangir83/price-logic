@@ -1,4 +1,5 @@
 export * from './billing.js';
+export * from './bulk-operation.js';
 export * from './campaign.js';
 export * from './campaign-target.js';
 export * from './csv-import.js';
@@ -8,4 +9,5 @@ export * from './price-change.js';
 export * from './product-tag-change.js';
 export * from './shop.js';
 export * from './shopify.js';
+export * from './store-settings.js';
 export * from './supplier.js';

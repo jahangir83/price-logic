@@ -2,13 +2,13 @@ import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import {
   SESSION_COOKIE_NAME,
   SessionService,
-} from '../../modules/session/session.service';
+} from '../../modules/session/services/session.service';
 import type {
   ShopifySessionTokenService,
   VerifiedSessionToken,
-} from '../../modules/session/shopify-session-token.service';
+} from '../../modules/session/services/shopify-session-token.service';
 import type { Shop } from '../../modules/shops/entities/shop.entity';
-import type { ShopsService } from '../../modules/shops/shops.service';
+import type { ShopsService } from '../../modules/shops/services/shops.service';
 import { SessionAuthGuard } from './session-auth.guard';
 import type { AuthenticatedRequest } from './authenticated-request';
 

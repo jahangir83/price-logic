@@ -19,15 +19,18 @@ import { useLocation, useNavigate } from 'react-router-dom';
  * The first link is the app's home and Shopify requires it to be marked as
  * such; its label is ignored in favour of the app's name.
  *
- * There is no link to `/setup`. Once a shop is set up that route redirects
- * away, so a permanent link to it would be a permanent link to somewhere else
- * — and the wizard's own copy already points at a Settings screen for changing
- * these later, which is what this menu should gain when that screen exists.
+ * Settings is a real destination now rather than a wizard step, so it earns a
+ * permanent place here — as does the FAQ, which the setup guide sends merchants
+ * to and which they should be able to find again afterwards.
  */
 const LINKS: { to: string; label: string }[] = [
+  { to: '/', label: 'Home' },
   { to: '/campaigns', label: 'Campaigns' },
-  { to: '/campaigns/new', label: 'Create campaign' },
+  { to: '/sheets', label: 'Price sheets' },
+  { to: '/suppliers', label: 'Suppliers' },
   { to: '/pricing', label: 'Plan and usage' },
+  { to: '/settings', label: 'Settings' },
+  { to: '/faq', label: 'How it works' },
 ];
 
 export function NavMenu(): ReactElement {

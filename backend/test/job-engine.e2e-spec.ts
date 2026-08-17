@@ -1,19 +1,25 @@
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { JobStatus, JobStep, JobType } from '@pricelogic/shared';
+import {
+  JobExecutionStatus,
+  JobStatus,
+  JobStep,
+  JobType,
+} from '@pricelogic/shared';
 import { DataSource } from 'typeorm';
 import { JobDependency } from '../src/modules/jobs/entities/job-dependency.entity';
 import { JobExecution } from '../src/modules/jobs/entities/job-execution.entity';
+import { JobStepResult } from '../src/modules/jobs/entities/job-step-result.entity';
 import { Job } from '../src/modules/jobs/entities/job.entity';
-import { JobDispatcherService } from '../src/modules/jobs/job-dispatcher.service';
+import { JobDispatcherService } from '../src/modules/jobs/services/job-dispatcher.service';
 import {
   JobContext,
   JobHandler,
   JobHandlerRegistry,
   PermanentJobError,
 } from '../src/modules/jobs/job-handler';
-import { JobsService } from '../src/modules/jobs/jobs.service';
+import { JobsService } from '../src/modules/jobs/services/jobs.service';
 
 /**
  * The job engine against a real PostgreSQL instance.
@@ -39,10 +45,15 @@ describe('job engine', () => {
         TypeOrmModule.forRoot({
           type: 'postgres',
           url: process.env.DATABASE_URL,
-          entities: [Job, JobExecution, JobDependency],
+          entities: [Job, JobExecution, JobDependency, JobStepResult],
           synchronize: false,
         }),
-        TypeOrmModule.forFeature([Job, JobExecution, JobDependency]),
+        TypeOrmModule.forFeature([
+          Job,
+          JobExecution,
+          JobDependency,
+          JobStepResult,
+        ]),
       ],
       providers: [
         JobsService,
@@ -83,6 +94,9 @@ describe('job engine', () => {
   const cleanup = async () => {
     await dataSource.query(`DELETE FROM job_dependencies`);
     await dataSource.query(`DELETE FROM job_executions`);
+    await dataSource.query(`DELETE FROM job_step_results`);
+    await dataSource.query(`UPDATE jobs SET bulk_operation_id = NULL`);
+    await dataSource.query(`DELETE FROM bulk_operations`);
     await dataSource.query(`DELETE FROM price_changes`);
     await dataSource.query(`DELETE FROM product_tag_changes`);
     await dataSource.query(`DELETE FROM jobs`);
@@ -575,6 +589,238 @@ describe('job engine', () => {
 
       expect(await jobs.releaseClaims('worker-going-away')).toBe(1);
       expect(await statusOf(claimed!.id)).toBe(JobStatus.PENDING);
+    });
+  });
+
+  describe('step results', () => {
+    it('keeps what each step produced, not just where the job got to', async () => {
+      const job = await jobs.enqueue(SHOP_A, {
+        type: JobType.CAMPAIGN_ACTIVATE,
+      });
+      await jobs.claimNext('w1');
+
+      await jobs.finishStep(
+        job.id,
+        JobStep.RESOLVE_TARGETS,
+        JobExecutionStatus.SUCCEEDED,
+        { variantIds: ['gid://shopify/ProductVariant/1'], total: 1 },
+      );
+
+      expect(await jobs.stepResult(job.id, JobStep.RESOLVE_TARGETS)).toEqual({
+        variantIds: ['gid://shopify/ProductVariant/1'],
+        total: 1,
+      });
+    });
+
+    it('does not hand back a result from a step that failed', async () => {
+      // Half-resolved targets are worse than none: the next attempt would
+      // price a subset and call it the whole campaign.
+      const job = await jobs.enqueue(SHOP_A, {
+        type: JobType.CAMPAIGN_ACTIVATE,
+      });
+      await jobs.claimNext('w1');
+
+      await jobs.finishStep(
+        job.id,
+        JobStep.RESOLVE_TARGETS,
+        JobExecutionStatus.FAILED,
+        { partial: true },
+        'Shopify unavailable',
+      );
+
+      expect(await jobs.stepResult(job.id, JobStep.RESOLVE_TARGETS)).toBeNull();
+    });
+
+    it('counts re-entries rather than adding a row per attempt', async () => {
+      const job = await jobs.enqueue(SHOP_A, { type: JobType.CSV_PARSE });
+      await jobs.claimNext('w1');
+
+      await jobs.beginStep(job.id, JobStep.PARSE_FILE);
+      await jobs.beginStep(job.id, JobStep.PARSE_FILE);
+
+      const rows = await jobs.stepResults(job.id);
+      const parse = rows.filter((row) => row.step === JobStep.PARSE_FILE);
+      expect(parse).toHaveLength(1);
+      // Claimed once, then re-entered twice.
+      expect(parse[0].tries).toBe(3);
+    });
+
+    it('records which step a failure happened on', async () => {
+      const job = await jobs.enqueue(SHOP_A, {
+        type: JobType.CAMPAIGN_ACTIVATE,
+      });
+      await jobs.claimNext('w1');
+      await jobs.advanceToStep(job.id, JobStep.PUSH_PRICES);
+
+      await jobs.fail(job.id, 'Shopify rejected the write');
+
+      const rows = await jobs.stepResults(job.id);
+      const push = rows.find((row) => row.step === JobStep.PUSH_PRICES);
+      expect(push?.status).toBe(JobExecutionStatus.FAILED);
+      expect(push?.errorMessage).toBe('Shopify rejected the write');
+      // The steps before it are still recorded as having succeeded.
+      const resolve = rows.find((row) => row.step === JobStep.RESOLVE_TARGETS);
+      expect(resolve?.status).toBe(JobExecutionStatus.SUCCEEDED);
+    });
+
+    it('survives both workers re-entering a step at once', async () => {
+      const job = await jobs.enqueue(SHOP_A, { type: JobType.CSV_PARSE });
+      await jobs.claimNext('w1');
+
+      await Promise.all([
+        jobs.beginStep(job.id, JobStep.PARSE_FILE),
+        jobs.beginStep(job.id, JobStep.PARSE_FILE),
+      ]);
+
+      const parse = (await jobs.stepResults(job.id)).filter(
+        (row) => row.step === JobStep.PARSE_FILE,
+      );
+      expect(parse).toHaveLength(1);
+    });
+  });
+
+  describe('bulk operations', () => {
+    const startOperation = async (jobId: string): Promise<string> => {
+      const [row]: { id: string }[] = await dataSource.query(
+        `INSERT INTO bulk_operations
+                (shop_id, job_id, shopify_bulk_operation_id, kind, status)
+         VALUES ($1, $2, $3, 'MUTATION', 'RUNNING')
+         RETURNING id`,
+        [SHOP_A, jobId, `gid://shopify/BulkOperation/${Date.now()}`],
+      );
+      return row.id;
+    };
+
+    it('parks a job and lets go of the worker', async () => {
+      // Holding a worker for the minutes a bulk operation takes would idle the
+      // pool and block every other job for the shop.
+      const job = await jobs.enqueue(SHOP_A, {
+        type: JobType.CAMPAIGN_ACTIVATE,
+      });
+      await jobs.claimNext('w1');
+      const operationId = await startOperation(job.id);
+
+      await jobs.parkOnBulkOperation(job.id, operationId);
+
+      const parked = await dataSource
+        .getRepository(Job)
+        .findOneOrFail({ where: { id: job.id } });
+      expect(parked.status).toBe(JobStatus.WAITING_BULK);
+      expect(parked.lockedBy).toBeNull();
+      expect(parked.bulkOperationId).toBe(operationId);
+    });
+
+    it('does not hand a parked job to another worker', async () => {
+      const job = await jobs.enqueue(SHOP_A, {
+        type: JobType.CAMPAIGN_ACTIVATE,
+      });
+      await jobs.claimNext('w1');
+      await jobs.parkOnBulkOperation(job.id, await startOperation(job.id));
+
+      expect(await jobs.claimNext('w2')).toBeNull();
+    });
+
+    it('keeps holding its dedup key while parked', async () => {
+      // A job waiting on Shopify is still in flight. Releasing the key would
+      // let a redelivered webhook enqueue a duplicate of work Shopify is at
+      // that moment executing.
+      const job = await jobs.enqueue(SHOP_A, {
+        type: JobType.CAMPAIGN_ACTIVATE,
+        dedupKey: 'activate-campaign-7',
+      });
+      await jobs.claimNext('w1');
+      await jobs.parkOnBulkOperation(job.id, await startOperation(job.id));
+
+      const again = await jobs.enqueue(SHOP_A, {
+        type: JobType.CAMPAIGN_ACTIVATE,
+        dedupKey: 'activate-campaign-7',
+      });
+      expect(again.id).toBe(job.id);
+    });
+
+    it('returns the job to the queue when the operation finishes', async () => {
+      const job = await jobs.enqueue(SHOP_A, {
+        type: JobType.CAMPAIGN_ACTIVATE,
+      });
+      await jobs.claimNext('w1');
+      const operationId = await startOperation(job.id);
+      await jobs.parkOnBulkOperation(job.id, operationId);
+
+      const resumed = await jobs.resumeFromBulkOperation(operationId);
+      expect(resumed?.id).toBe(job.id);
+      expect(await statusOf(job.id)).toBe(JobStatus.PENDING);
+      expect((await jobs.claimNext('w2'))?.id).toBe(job.id);
+    });
+
+    it('does not charge an attempt for waiting on Shopify', async () => {
+      // Otherwise a campaign of five chunks would exhaust its retries without
+      // anything having failed.
+      const job = await jobs.enqueue(SHOP_A, {
+        type: JobType.CAMPAIGN_ACTIVATE,
+        maxAttempts: 2,
+      });
+      await jobs.claimNext('w1');
+      const operationId = await startOperation(job.id);
+      await jobs.parkOnBulkOperation(job.id, operationId);
+      await jobs.resumeFromBulkOperation(operationId);
+
+      const claimed = await jobs.claimNext('w2');
+      expect(claimed?.attempts).toBe(1);
+    });
+
+    it('resumes the same attempt rather than opening a second execution', async () => {
+      /*
+       * The attempt is handed back on park, so the next claim lands on the same
+       * number. Inserting another execution row would violate the unique index
+       * and throw out of the dispatcher, leaving the job unclaimable in a loop.
+       */
+      const job = await jobs.enqueue(SHOP_A, {
+        type: JobType.CAMPAIGN_ACTIVATE,
+      });
+      await jobs.claimNext('w1');
+      await jobs.advanceToStep(job.id, JobStep.PUSH_PRICES);
+      const operationId = await startOperation(job.id);
+      await jobs.parkOnBulkOperation(job.id, operationId);
+      await jobs.resumeFromBulkOperation(operationId);
+
+      const claimed = await jobs.claimNext('w2');
+      expect(claimed).not.toBeNull();
+
+      const [{ count }]: { count: string }[] = await dataSource.query(
+        `SELECT count(*)::text AS count FROM job_executions WHERE job_id = $1`,
+        [job.id],
+      );
+      expect(count).toBe('1');
+      // And it picks up where it left off rather than at the first step.
+      expect((await jobs.currentExecution(job.id))?.step).toBe(
+        JobStep.PUSH_PRICES,
+      );
+    });
+
+    it('ignores a finish for an operation nothing is waiting on', async () => {
+      const job = await jobs.enqueue(SHOP_A, { type: JobType.CSV_PARSE });
+      await jobs.claimNext('w1');
+      const operationId = await startOperation(job.id);
+
+      // Never parked, so there is nothing to wake.
+      expect(await jobs.resumeFromBulkOperation(operationId)).toBeNull();
+      expect(await statusOf(job.id)).toBe(JobStatus.RUNNING);
+    });
+
+    it('detaches the operation once its results are dealt with', async () => {
+      const job = await jobs.enqueue(SHOP_A, {
+        type: JobType.CAMPAIGN_ACTIVATE,
+      });
+      await jobs.claimNext('w1');
+      const operationId = await startOperation(job.id);
+      await jobs.parkOnBulkOperation(job.id, operationId);
+
+      await jobs.clearBulkOperation(job.id);
+
+      const cleared = await dataSource
+        .getRepository(Job)
+        .findOneOrFail({ where: { id: job.id } });
+      expect(cleared.bulkOperationId).toBeNull();
     });
   });
 

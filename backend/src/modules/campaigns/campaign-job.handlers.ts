@@ -6,10 +6,11 @@ import {
   JobHandlerRegistry,
   PermanentJobError,
   type JobContext,
+  type JobResult,
 } from '../jobs/job-handler';
 import { Shop } from '../shops/entities/shop.entity';
-import { ActivationService } from './activation.service';
-import { RevertService } from './revert.service';
+import { ActivationService } from './services/activation.service';
+import { RevertService } from './services/revert.service';
 
 /**
  * Campaign activation, as a job.
@@ -91,7 +92,7 @@ export class CampaignJobHandlers implements OnModuleInit {
     );
   }
 
-  private async activate(context: JobContext): Promise<void> {
+  private async activate(context: JobContext): Promise<JobResult | void> {
     const campaignId = context.job.campaignId;
     if (!campaignId) {
       throw new PermanentJobError(
@@ -127,8 +128,24 @@ export class CampaignJobHandlers implements OnModuleInit {
           });
         },
         shouldStop: () => context.shouldStop(),
+        recordStep: (result) => context.recordStep(result),
+        waitForBulk: (bulkOperationId) =>
+          context.waitForBulkOperation(bulkOperationId),
       },
     );
+
+    /*
+     * Parked on a bulk operation: Shopify is still writing the prices. The job
+     * is not finished and must not be completed — `bulk_operations/finish`
+     * brings it back, and it carries on from PUSH_PRICES.
+     */
+    if (outcome.waitingForBulk) {
+      this.logger.log(
+        `Campaign ${campaignId} waiting on a bulk operation ` +
+          `(${outcome.applied} of ${outcome.total} applied so far)`,
+      );
+      return { waitingForBulk: true };
+    }
 
     await context.advanceTo(JobStep.FINALIZE);
 

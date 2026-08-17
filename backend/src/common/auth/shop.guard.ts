@@ -6,7 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ShopStatus } from '../../modules/shops/entities/shop.entity';
-import { ShopsService } from '../../modules/shops/shops.service';
+import { ShopsService } from '../../modules/shops/services/shops.service';
 import { SessionAuthGuard } from './session-auth.guard';
 import type { AuthenticatedRequest } from './authenticated-request';
 

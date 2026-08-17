@@ -1,3 +1,4 @@
+import { CSV_COLUMN_ALIASES, buildExampleSheet } from '@pricelogic/shared';
 import { normalisePrice, parseSheet, tokenizeCsv } from './csv-parser';
 
 describe('tokenizeCsv', () => {
@@ -186,5 +187,99 @@ describe('parseSheet', () => {
       // Only one usable row for this SKU, so it is not ambiguous.
       expect(withBad.rows[1]?.error).toBeNull();
     });
+  });
+});
+
+describe('the example sheet we hand merchants', () => {
+  // The point of these: the example is generated from CSV_COLUMN_ALIASES, and
+  // this is what holds that generation honest. If the parser's idea of a valid
+  // sheet ever moves, the file we tell merchants to copy stops being one — and
+  // nothing else would notice.
+  it('parses without a fatal error', () => {
+    const sheet = parseSheet(buildExampleSheet());
+
+    expect(sheet.fatalError).toBeNull();
+  });
+
+  it('has every row come out valid', () => {
+    const sheet = parseSheet(buildExampleSheet());
+
+    expect(sheet.rows).toHaveLength(3);
+    expect(sheet.rows.every((row) => row.error === null)).toBe(true);
+  });
+
+  it('maps every column the aliases declare', () => {
+    const sheet = parseSheet(buildExampleSheet());
+
+    for (const column of Object.keys(CSV_COLUMN_ALIASES)) {
+      expect(
+        sheet.columnMap[column as keyof typeof CSV_COLUMN_ALIASES],
+      ).toBeDefined();
+    }
+  });
+
+  it('shows that compare-at is optional by leaving one blank', () => {
+    // A merchant reading the example should not have to be told twice.
+    const sheet = parseSheet(buildExampleSheet());
+
+    expect(sheet.rows.some((row) => row.compareAtPrice === null)).toBe(true);
+    expect(sheet.rows.some((row) => row.compareAtPrice !== null)).toBe(true);
+  });
+});
+
+describe('the optional stock column', () => {
+  it('reads a plain count', () => {
+    const sheet = parseSheet('sku,price,stock\nA,10.00,12\n');
+
+    expect(sheet.rows[0].stock).toBe(12);
+    expect(sheet.rows[0].error).toBeNull();
+  });
+
+  it('accepts the aliases suppliers actually use', () => {
+    for (const header of ['qty', 'quantity', 'available', 'inventory']) {
+      const sheet = parseSheet(`sku,price,${header}\nA,10.00,5\n`);
+      expect(sheet.rows[0].stock).toBe(5);
+    }
+  });
+
+  it('leaves a sheet with no stock column entirely unaffected', () => {
+    // The overwhelming majority of sheets. Null, not zero — otherwise adding
+    // this feature would stop every existing sheet from repricing anything.
+    const sheet = parseSheet('sku,price\nA,10.00\n');
+
+    expect(sheet.fatalError).toBeNull();
+    expect(sheet.rows[0].stock).toBeNull();
+    expect(sheet.rows[0].error).toBeNull();
+  });
+
+  it('reads a blank cell as unknown rather than none', () => {
+    const sheet = parseSheet('sku,price,stock\nA,10.00,\n');
+
+    expect(sheet.rows[0].stock).toBeNull();
+  });
+
+  it('honours words that plainly mean none', () => {
+    // Common enough in real exports that treating it as unknown would reprice
+    // exactly the rows this is meant to leave alone.
+    for (const text of ['out of stock', 'Sold Out', 'none', 'no']) {
+      const sheet = parseSheet(`sku,price,stock\nA,10.00,${text}\n`);
+      expect(sheet.rows[0].stock).toBe(0);
+    }
+  });
+
+  it('never fails a row over the stock cell', () => {
+    // Stock is an optional extra: a supplier who writes "call us" has still
+    // sent a perfectly good price, and rejecting the row would invent a problem.
+    const sheet = parseSheet('sku,price,stock\nA,10.00,call us\n');
+
+    expect(sheet.rows[0].error).toBeNull();
+    expect(sheet.rows[0].price).toBe('10.00');
+    expect(sheet.rows[0].stock).toBeNull();
+  });
+
+  it('strips thousands separators', () => {
+    const sheet = parseSheet('sku,price,stock\nA,10.00,"1,250"\n');
+
+    expect(sheet.rows[0].stock).toBe(1250);
   });
 });

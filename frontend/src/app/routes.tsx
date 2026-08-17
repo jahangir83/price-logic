@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Banner, Page } from '@shopify/polaris';
 import { CampaignStatus, type CampaignDto } from '@pricelogic/shared';
 import { CampaignForm } from '../pages/CampaignForm/CampaignForm';
@@ -7,7 +7,6 @@ import { CampaignList } from '../pages/CampaignList/CampaignList';
 import { CampaignPreview } from '../pages/CampaignPreview/CampaignPreview';
 import { CampaignResults } from '../pages/CampaignResults/CampaignResults';
 import { SheetApproval } from '../pages/SheetApproval/SheetApproval';
-import { SetupWizard } from '../pages/SetupWizard/SetupWizard';
 import { useShop } from './shop';
 
 /**
@@ -48,13 +47,41 @@ export function CampaignListRoute(): ReactElement {
 export function CampaignFormRoute(): ReactElement {
   const navigate = useNavigate();
   const { currency } = useShop();
+  const [params] = useSearchParams();
+  const copyFromId = params.get('from') ?? undefined;
   return (
     <CampaignForm
+      key={copyFromId ?? 'new'}
+      copyFromId={copyFromId}
       currency={currency}
-      // Saved as a draft, so the preview is where the merchant goes next: it is
-      // the screen that answers "what will this actually do", which is the
-      // question standing between a draft and activating it.
+      // A new campaign has no id until it is saved, so saving is also the
+      // moment it becomes something that can be previewed and activated —
+      // which is what the editor at `/campaigns/:id` offers.
       onSaved={(campaignId) => navigate(`/campaigns/${campaignId}`)}
+    />
+  );
+}
+
+/**
+ * Opening a saved campaign.
+ *
+ * The same component as `/campaigns/new`: a draft the merchant is still
+ * building and one they opened a day later are the same thing, and splitting
+ * them into a builder and a read-only detail page is what left the app with no
+ * way to change a campaign after saving it.
+ */
+export function CampaignEditRoute(): ReactElement {
+  const { campaignId } = useParams();
+  const navigate = useNavigate();
+  const { currency } = useShop();
+  if (!campaignId) return <BadLink />;
+  return (
+    <CampaignForm
+      key={campaignId}
+      campaignId={campaignId}
+      currency={currency}
+      onDuplicate={(id) => navigate(`/campaigns/new?from=${id}`)}
+      onViewResults={(id) => navigate(`/campaigns/${id}/results`)}
     />
   );
 }
@@ -67,9 +94,16 @@ export function CampaignPreviewRoute(): ReactElement {
 
 export function CampaignResultsRoute(): ReactElement {
   const { campaignId } = useParams();
+  const navigate = useNavigate();
   const { currency } = useShop();
   if (!campaignId) return <BadLink />;
-  return <CampaignResults campaignId={campaignId} currency={currency} />;
+  return (
+    <CampaignResults
+      campaignId={campaignId}
+      currency={currency}
+      onOpenCampaign={(id) => navigate(`/campaigns/${id}`)}
+    />
+  );
 }
 
 export function SheetApprovalRoute(): ReactElement {
@@ -84,50 +118,6 @@ export function SheetApprovalRoute(): ReactElement {
       onApproved={(campaignId) => navigate(`/campaigns/${campaignId}`)}
     />
   );
-}
-
-/**
- * The wizard, or past it.
- *
- * The OAuth callback lands every install here, including a reinstall by a shop
- * that was set up months ago — its settings survived the uninstall, so walking
- * it back through five steps of questions it has already answered would be the
- * app forgetting something it plainly remembers.
- */
-export function SetupRoute(): ReactElement {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { isSetUp, markSetUp } = useShop();
-
-  if (isSetUp) return <Navigate to="/campaigns" replace />;
-
-  // Where the gate turned them away from, if it did. Router state is the right
-  // carrier for it: it is not part of the address, and a merchant who bookmarks
-  // the wizard should get the wizard, not somebody else's interrupted journey.
-  const from = (location.state as { from?: string } | null)?.from;
-
-  return (
-    <SetupWizard
-      onFinished={() => {
-        // Told locally as well as on the server: the gate below reads this, and
-        // re-fetching only to learn what we just wrote would put a spinner
-        // between the merchant and the app on the one screen where they have
-        // just been told they are finished.
-        markSetUp();
-        navigate(from ?? '/campaigns', { replace: true });
-      }}
-    />
-  );
-}
-
-/**
- * Where an unrecognised URL lands.
- *
- * The setup gate decides between the wizard and the app, so this is one
- * redirect rather than two rules that can disagree.
- */
-export function HomeRoute(): ReactElement {
-  return <Navigate to="/campaigns" replace />;
 }
 
 /** A route that matched but produced no id — a truncated or edited URL. */

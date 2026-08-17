@@ -1,4 +1,5 @@
 import type { DuplicatePolicy } from './campaign.js';
+import type { ShopOnboarding, StoreSettings } from './store-settings.js';
 import type { Serialized } from '../serialization.js';
 
 export enum ShopStatus {
@@ -7,6 +8,14 @@ export enum ShopStatus {
   SUSPENDED = 'SUSPENDED',
 }
 
+/**
+ * Whether this shop has been prepared for use — which since setup became
+ * optional means one thing only: does it have its default settings yet.
+ *
+ * It used to mean "has the merchant finished the setup wizard". There is no
+ * wizard to finish now, and a column keeping a name from a flow that no longer
+ * exists is how a schema stops being readable.
+ */
 export enum InitializationStatus {
   NOT_STARTED = 'NOT_STARTED',
   IN_PROGRESS = 'IN_PROGRESS',
@@ -29,7 +38,18 @@ export interface Shop {
   timezone: string;
   status: ShopStatus;
   initializationStatus: InitializationStatus;
-  defaultSettings: Record<string, unknown>;
+
+  /**
+   * Partial rather than complete, because that is what the column can actually
+   * hold: it is jsonb, and every shop installed before defaults were seeded has
+   * `{}` in it. Reads fill the gaps from `DEFAULT_STORE_SETTINGS` and write the
+   * result back, so a row converges on being complete — but the type must not
+   * claim it already is.
+   */
+  defaultSettings: Partial<StoreSettings>;
+
+  /** What the merchant has done of what the setup guide suggests. */
+  onboarding: ShopOnboarding;
 
   /**
    * The merchant's global setting for a variant claimed by two campaigns. A

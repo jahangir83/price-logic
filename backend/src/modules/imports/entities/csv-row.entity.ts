@@ -1,3 +1,4 @@
+import { MatchStrategy } from '@pricelogic/shared';
 import {
   CsvRowStatus,
   type CsvRow as CsvRowModel,
@@ -104,6 +105,47 @@ export class CsvRow implements CsvRowModel {
 
   @Column({ name: 'shopify_variant_id', type: 'varchar', nullable: true })
   shopifyVariantId!: string | null;
+
+  /**
+   * Copied from Shopify at match time, not looked up for display. A sheet
+   * reviewed today may be approved next week, and a product renamed in between
+   * must not turn the review into a list of codes.
+   */
+  @Column({ name: 'product_title', type: 'varchar', nullable: true })
+  productTitle!: string | null;
+
+  @Column({ name: 'variant_title', type: 'varchar', nullable: true })
+  variantTitle!: string | null;
+
+  /** What the supplier's sheet said. Null means it did not say. */
+  @Column({ name: 'sheet_stock', type: 'integer', nullable: true })
+  sheetStock!: number | null;
+
+  /** The supplier's own code, when their sheet carries one. */
+  @Column({ name: 'supplier_sku', type: 'varchar', nullable: true })
+  supplierSku!: string | null;
+
+  /** UPC / EAN / GTIN from the sheet, when it carries one. */
+  @Column({ type: 'varchar', nullable: true })
+  barcode!: string | null;
+
+  /**
+   * Which rung of the ladder found the variant, or null when none did.
+   *
+   * Varchar rather than an enum type: the list grows (manual mapping is next)
+   * and each addition to a Postgres enum is a migration that locks the table.
+   * `MatchStrategy` in the shared package is what constrains it.
+   */
+  @Column({ name: 'matched_by', type: 'varchar', nullable: true })
+  matchedBy!: MatchStrategy | null;
+
+  /**
+   * What Shopify reported at match time. Shown to the merchant, but not what
+   * the skip is decided on at activation — stock moves between review and run,
+   * so activation re-reads it live.
+   */
+  @Column({ name: 'stock_quantity', type: 'integer', nullable: true })
+  stockQuantity!: number | null;
 
   /** Merchant can drop a row from the campaign without deleting the record. */
   @Column({ type: 'boolean', default: false })

@@ -12,12 +12,13 @@ import { PriceChange } from '../src/modules/campaigns/entities/price-change.enti
 import { ProductTagChange } from '../src/modules/campaigns/entities/product-tag-change.entity';
 import { CsvImport } from '../src/modules/imports/entities/csv-import.entity';
 import { CsvRow } from '../src/modules/imports/entities/csv-row.entity';
-import { ImportsService } from '../src/modules/imports/imports.service';
+import { ImportsService } from '../src/modules/imports/services/imports.service';
 import { JobDependency } from '../src/modules/jobs/entities/job-dependency.entity';
 import { JobExecution } from '../src/modules/jobs/entities/job-execution.entity';
 import { Job } from '../src/modules/jobs/entities/job.entity';
-import { JobsService } from '../src/modules/jobs/jobs.service';
-import { ShopifyAdminService } from '../src/modules/shopify/shopify-admin.service';
+import { JobStepResult } from '../src/modules/jobs/entities/job-step-result.entity';
+import { JobsService } from '../src/modules/jobs/services/jobs.service';
+import { ShopifyAdminService } from '../src/modules/shopify/services/shopify-admin.service';
 import { Shop } from '../src/modules/shops/entities/shop.entity';
 import { Supplier } from '../src/modules/suppliers/entities/supplier.entity';
 
@@ -112,6 +113,7 @@ describe('supplier sheet import', () => {
             Job,
             JobExecution,
             JobDependency,
+            JobStepResult,
           ],
           synchronize: false,
         }),

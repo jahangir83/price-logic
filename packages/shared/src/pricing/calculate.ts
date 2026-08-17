@@ -106,14 +106,50 @@ export interface PriceCalculationResult {
 /**
  * Should this row be written to Shopify, or recorded as SKIPPED?
  *
- * A floored price is a nonsense price — the campaign asked for more off than
- * the product costs — and writing zero is worse than writing nothing, because
- * the merchant cannot tell the difference between "free by design" and "the
- * maths went wrong". An unchanged row is skipped because there is nothing to
- * send.
+ * A floored price is a price the merchant did not agree to — either the
+ * campaign asked for more off than the product costs, or the result fell under
+ * the minimum price they set. Writing the floor instead is worse than writing
+ * nothing, because the merchant cannot tell the difference between a price
+ * chosen and a price clamped. An unchanged row is skipped because there is
+ * nothing to send.
  */
 export function shouldApply(result: PriceCalculationResult): boolean {
   return result.changed && result.outcome !== 'FLOORED';
+}
+
+/**
+ * Why a row came out the way it did, in words for the merchant.
+ *
+ * Shared rather than written per screen. The preview, the sheet approval and
+ * the activation record all describe the same calculation, and three copies of
+ * this text is three chances for the reason a variant was skipped to be
+ * reported differently depending on which screen the merchant happens to be
+ * looking at.
+ *
+ * Null means there is nothing worth saying.
+ */
+export function describeOutcome(
+  result: PriceCalculationResult,
+  options: { hasMerchantFloor?: boolean } = {},
+): string | null {
+  if (result.outcome === 'FLOORED') {
+    // Two different causes, and the merchant can act on one of them. Saying
+    // "larger than the price" to someone who set a £5 floor sends them looking
+    // for a bug in their discount.
+    return options.hasMerchantFloor
+      ? 'This would have gone below your minimum price, so this variant is left alone.'
+      : 'The discount is larger than the price, so this variant is left alone.';
+  }
+  if (result.outcome === 'UNCHANGED') {
+    return 'Already at this price.';
+  }
+  if (result.warnings.includes('ROUNDING_OPPOSED_DIRECTION')) {
+    return 'Rounding moved this price against the discount — try rounding to nearest.';
+  }
+  if (result.warnings.includes('COMPARE_AT_SUPPRESSED')) {
+    return 'No compare-at was set, because it would not have shown a saving.';
+  }
+  return null;
 }
 
 /**

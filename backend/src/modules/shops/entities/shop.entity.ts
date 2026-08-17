@@ -4,6 +4,8 @@ import {
   InitializationStatus,
   ShopStatus,
   type Shop as ShopModel,
+  type ShopOnboarding,
+  type StoreSettings,
 } from '@pricelogic/shared';
 import {
   Column,
@@ -60,12 +62,30 @@ export class Shop implements ShopModel {
   initializationStatus!: InitializationStatus;
 
   /**
-   * Merchant-editable defaults collected during the setup wizard. The
-   * pricing engine (Phase 4/5) reads these; kept as a loose JSON bag here
-   * since the concrete pricing-rule shape is defined in a later phase.
+   * The merchant's shop-wide pricing defaults, seeded at install and editable
+   * from the settings screen.
+   *
+   * `Partial` because that is what the column can hold: shops installed before
+   * defaults were seeded have `{}`. Reads fill the gaps and write the result
+   * back, so a row converges on complete without the type having to lie about
+   * rows that are not there yet.
+   *
+   * **Nothing enforces these.** They are stored, shown and edited; no code path
+   * consults them before calculating or applying a price. Said plainly here
+   * because `minimumPrice` reads like a guardrail and is not yet acting as one.
    */
   @Column({ name: 'default_settings', type: 'jsonb', default: {} })
-  defaultSettings!: Record<string, unknown>;
+  defaultSettings!: Partial<StoreSettings>;
+
+  /**
+   * Which of the setup guide's suggestions the merchant has done.
+   *
+   * Only the steps completed by going somewhere live here. Having a first
+   * campaign is derived from the campaigns table on read, so it cannot drift
+   * out of agreement with the campaigns that actually exist.
+   */
+  @Column({ name: 'onboarding', type: 'jsonb', default: {} })
+  onboarding!: ShopOnboarding;
 
   /**
    * The merchant's global setting for a variant claimed by two active

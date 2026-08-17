@@ -31,6 +31,30 @@ export interface JobContext {
   shouldStop(): Promise<boolean>;
   /** Hand the remaining work to child jobs and finish this one. */
   spawnChildren(specs: ChildJobSpec[]): Promise<void>;
+
+  /**
+   * Record what the current step produced.
+   *
+   * A step is a unit of work, not a cursor: what it resolved, priced or staged
+   * is written down so the next step — or the next attempt — reads it instead
+   * of recomputing it. Re-resolving targets on a retry would also re-read
+   * prices that the half-finished run has already changed, which is how a
+   * revert ends up restoring a price that was never on the storefront.
+   */
+  recordStep(result: Record<string, unknown>): Promise<void>;
+
+  /** What an earlier step of this job produced, or null if it has not run. */
+  stepResult<T = Record<string, unknown>>(step: JobStep): Promise<T | null>;
+
+  /**
+   * Park this job on a Shopify bulk operation and stop.
+   *
+   * The handler returns immediately afterwards; the job is woken by the
+   * `bulk_operations/finish` webhook (or the poller) and runs again from the
+   * step it recorded. Holding the worker for the minutes a bulk operation takes
+   * would idle the pool and block every other job for that shop.
+   */
+  waitForBulkOperation(bulkOperationId: string): Promise<void>;
 }
 
 export interface ChildJobSpec {
@@ -52,6 +76,12 @@ export interface JobResult {
   result?: Record<string, unknown>;
   /** Set when the handler delegated its work to children. */
   spawnedChildren?: boolean;
+  /**
+   * Set when the handler parked on a bulk operation. Like `spawnedChildren`,
+   * this means the job is not finished — completing it here would mark a
+   * campaign applied while Shopify is still writing the prices.
+   */
+  waitingForBulk?: boolean;
 }
 
 /**

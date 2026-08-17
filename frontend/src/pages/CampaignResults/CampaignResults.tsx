@@ -25,6 +25,8 @@ interface CampaignResultsProps {
   campaignId: string;
   currency?: string;
   pageSize?: number;
+  /** Back to the campaign's own page — its settings and lifecycle actions. */
+  onOpenCampaign?: (campaignId: string) => void;
 }
 
 /** How often to re-check while a run is in flight. */
@@ -42,6 +44,7 @@ export function CampaignResults({
   campaignId,
   currency = 'USD',
   pageSize = 25,
+  onOpenCampaign,
 }: CampaignResultsProps) {
   const [results, setResults] = useState<CampaignResultsResponse | null>(null);
   const [progress, setProgress] = useState<CampaignProgressResponse | null>(null);
@@ -108,7 +111,21 @@ export function CampaignResults({
   const totalPages = Math.max(1, Math.ceil(results.totalItems / pageSize));
 
   return (
-    <Page title="Campaign results">
+    <Page
+      title="Campaign results"
+      // The way back to the settings, and to Deactivate — without it this
+      // screen is a dead end for a campaign that is running right now.
+      secondaryActions={
+        onOpenCampaign
+          ? [
+              {
+                content: 'Open campaign',
+                onAction: () => onOpenCampaign(campaignId),
+              },
+            ]
+          : []
+      }
+    >
       <BlockStack gap="400">
         {error ? (
           <Banner tone="critical" title="Something went wrong">

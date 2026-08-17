@@ -18,6 +18,15 @@ export enum JobStatus {
   RUNNING = 'RUNNING',
   /** Work handed to child jobs; completes when they all finish. */
   WAITING_CHILDREN = 'WAITING_CHILDREN',
+  /**
+   * Parked on a Shopify bulk operation.
+   *
+   * Distinct from PAUSED, which is a merchant's decision and stays parked until
+   * they say otherwise. This one resumes by itself when the operation finishes,
+   * and the difference matters to anyone reading the queue: a job nobody will
+   * ever resume looks exactly like one waiting on Shopify otherwise.
+   */
+  WAITING_BULK = 'WAITING_BULK',
   PAUSED = 'PAUSED',
   SUCCEEDED = 'SUCCEEDED',
   FAILED = 'FAILED',
@@ -101,6 +110,7 @@ export const LIVE_JOB_STATUSES: readonly JobStatus[] = [
   JobStatus.BLOCKED,
   JobStatus.RUNNING,
   JobStatus.WAITING_CHILDREN,
+  JobStatus.WAITING_BULK,
   JobStatus.PAUSED,
 ];
 
@@ -155,6 +165,16 @@ export interface Job {
   cancelRequestedAt: Date | null;
   pausedAt: Date | null;
 
+  /**
+   * The bulk operation this job is parked on, if any.
+   *
+   * Held on the job rather than only on the operation so the dispatcher can
+   * answer "is this job waiting on Shopify?" without a join, and so a
+   * `bulk_operations/finish` webhook can find its job from the operation id
+   * alone.
+   */
+  bulkOperationId: string | null;
+
   totalCount: number;
   processedCount: number;
   failedCount: number;
@@ -201,6 +221,38 @@ export interface JobExecution {
 }
 
 export type JobExecutionDto = Serialized<JobExecution>;
+
+/**
+ * What one step of a job produced.
+ *
+ * A step is a unit of work, not a cursor. `job_executions.step` says where an
+ * attempt got to; this says what each step along the way actually did — its
+ * status, how many tries it took, and the result a later step reads instead of
+ * recomputing. Resolving 4,000 targets and then failing on the push should not
+ * mean resolving them again on the retry.
+ *
+ * Keyed on `(job_id, step)` and rewritten in place: the row is the current
+ * answer for that step, while the per-attempt history stays in
+ * `job_executions`. A step that runs twice increments `tries` rather than
+ * adding a row, so "what did RESOLVE_TARGETS produce?" has exactly one answer.
+ */
+export interface JobStepResult {
+  id: string;
+  shopId: string;
+  jobId: string;
+  step: JobStep;
+  status: JobExecutionStatus;
+  /** How many times this step has been entered across all attempts. */
+  tries: number;
+  result: Record<string, unknown> | null;
+  errorMessage: string | null;
+  startedAt: Date | null;
+  finishedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type JobStepResultDto = Serialized<JobStepResult>;
 
 /**
  * One edge of the dependency graph: `jobId` waits for `dependsOnJobId`.

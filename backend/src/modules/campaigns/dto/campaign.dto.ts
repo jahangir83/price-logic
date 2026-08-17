@@ -53,24 +53,42 @@ export class IsMoneyStringConstraint implements ValidatorConstraintInterface {
  * — per the phase brief, validation belongs in the DTO rather than the
  * controller body, and per the constitution the same rules have to be callable
  * from the sheet-approval path that builds a campaign server-side.
+ *
+ * **Create and update differ in one rule** — only a create rejects a start date
+ * in the past, because an existing campaign's start date is history and editing
+ * an unrelated field must not fail because of it. That difference is carried by
+ * *which subclass a DTO attaches*, never by a field on the payload: a field
+ * would have to survive the `forbidNonWhitelisted` pass, and once whitelisted a
+ * client could send `__isCreate: false` on a create and skip the rule.
  */
-@ValidatorConstraint({ name: 'CampaignConsistency' })
-export class CampaignConsistencyConstraint implements ValidatorConstraintInterface {
+abstract class CampaignConsistency implements ValidatorConstraintInterface {
+  protected abstract readonly isCreate: boolean;
+
   validate(_value: unknown, args: ValidationArguments): boolean {
-    const object = args.object as Record<string, unknown>;
-    return (
-      validateCampaign(object, { isCreate: object.__isCreate === true }) ===
-      null
-    );
+    return this.check(args) === null;
   }
 
   defaultMessage(args: ValidationArguments): string {
-    const object = args.object as Record<string, unknown>;
-    return (
-      validateCampaign(object, { isCreate: object.__isCreate === true }) ??
-      'The campaign configuration is not valid.'
-    );
+    return this.check(args) ?? 'The campaign configuration is not valid.';
   }
+
+  private check(args: ValidationArguments): string | null {
+    return validateCampaign(args.object, {
+      isCreate: this.isCreate,
+    });
+  }
+}
+
+/** For a campaign being created — a start date in the past is rejected. */
+@ValidatorConstraint({ name: 'NewCampaignConsistency' })
+export class NewCampaignConsistencyConstraint extends CampaignConsistency {
+  protected readonly isCreate = true;
+}
+
+/** For an edit — every rule except the one about the start date being past. */
+@ValidatorConstraint({ name: 'CampaignConsistency' })
+export class CampaignConsistencyConstraint extends CampaignConsistency {
+  protected readonly isCreate = false;
 }
 
 export class CampaignTargetInputDto {
@@ -87,13 +105,6 @@ export class CampaignTargetInputDto {
 }
 
 export class CreateCampaignDto implements CreateCampaignRequest {
-  /**
-   * Marks this as a create for the shared rules, which only reject a start
-   * date in the past on create — an existing campaign's start date is history
-   * and editing an unrelated field must not fail because of it.
-   */
-  readonly __isCreate = true;
-
   @IsString()
   @MinLength(1)
   @MaxLength(255)
@@ -190,7 +201,12 @@ export class CreateCampaignDto implements CreateCampaignRequest {
   @IsString()
   endTimezone?: string;
 
-  @Validate(CampaignConsistencyConstraint)
+  /**
+   * The anchor for the object-level rules — the constraint reads the whole DTO
+   * rather than this value. It carries a validation decorator, which is also
+   * what keeps `forbidNonWhitelisted` from rejecting it.
+   */
+  @Validate(NewCampaignConsistencyConstraint)
   readonly __consistency = true;
 }
 
@@ -199,8 +215,6 @@ export class CreateCampaignDto implements CreateCampaignRequest {
  * not editable, so this only has to describe the shape.
  */
 export class UpdateCampaignDto {
-  readonly __isCreate = false;
-
   @IsOptional()
   @IsString()
   @MinLength(1)
@@ -286,6 +300,15 @@ export class UpdateCampaignDto {
   @IsOptional()
   @IsString()
   endTimezone?: string;
+
+    @IsOptional()
+  @IsArray()
+  // A campaign with 5,000 hand-picked targets is a bulk import, not a form
+  // submission, and would make the resolver's query unbounded.
+  @ArrayMaxSize(1000)
+  @ValidateNested({ each: true })
+  @Type(() => CampaignTargetInputDto)
+  targets?: CampaignTargetInputDto[];
 
   @Validate(CampaignConsistencyConstraint)
   readonly __consistency = true;

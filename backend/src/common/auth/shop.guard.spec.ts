@@ -9,7 +9,7 @@ import {
   Shop,
   ShopStatus,
 } from '../../modules/shops/entities/shop.entity';
-import { ShopsService } from '../../modules/shops/shops.service';
+import { ShopsService } from '../../modules/shops/services/shops.service';
 import { SessionAuthGuard } from './session-auth.guard';
 import { ShopGuard } from './shop.guard';
 
@@ -30,6 +30,11 @@ describe('ShopGuard', () => {
     shopDomain: 'my-store.myshopify.com',
     accessTokenEncrypted: 'enc',
     currency: 'USD',
+    onboarding: {
+      settingsVisitedAt: null,
+      faqVisitedAt: null,
+      dismissedAt: null,
+    },
     timezone: 'UTC',
     initializationStatus: InitializationStatus.COMPLETE,
     defaultSettings: {},

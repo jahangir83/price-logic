@@ -1,13 +1,16 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../../common/auth/auth.module';
 import { ShopsModule } from '../shops/shops.module';
-import { CatalogController } from './catalog.controller';
+import { BulkOperationService } from './services/bulk-operation.service';
+import { CatalogController } from './controllers/catalog.controller';
+import { BulkOperation } from './entities/bulk-operation.entity';
 import { ShopifyResponseCache } from './response-cache';
-import { ShopifyAdminService } from './shopify-admin.service';
+import { ShopifyAdminService } from './services/shopify-admin.service';
 import { ShopifyGraphQlClient } from './shopify-graphql.client';
 import { ThrottleRegistry } from './throttle';
 import { ShopifyClientFactory } from './shopify-client';
-import { WebhookRegistrarService } from './webhook-registrar.service';
+import { WebhookRegistrarService } from './services/webhook-registrar.service';
 
 /**
  * The Shopify adapter layer.
@@ -18,10 +21,11 @@ import { WebhookRegistrarService } from './webhook-registrar.service';
  * limiting and error translation in one enforceable place.
  */
 @Module({
-  imports: [ShopsModule, AuthModule],
+  imports: [ShopsModule, AuthModule, TypeOrmModule.forFeature([BulkOperation])],
   controllers: [CatalogController],
   providers: [
     ShopifyAdminService,
+    BulkOperationService,
     ShopifyGraphQlClient,
     ShopifyResponseCache,
     ThrottleRegistry,
@@ -29,7 +33,9 @@ import { WebhookRegistrarService } from './webhook-registrar.service';
     WebhookRegistrarService,
   ],
   exports: [
+    TypeOrmModule,
     ShopifyAdminService,
+    BulkOperationService,
     ShopifyResponseCache,
     ShopifyClientFactory,
     WebhookRegistrarService,

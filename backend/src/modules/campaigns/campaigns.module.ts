@@ -5,21 +5,21 @@ import { Campaign } from './entities/campaign.entity';
 import { CampaignTarget } from './entities/campaign-target.entity';
 import { PriceChange } from './entities/price-change.entity';
 import { ProductTagChange } from './entities/product-tag-change.entity';
-import { OverlapService } from './overlap.service';
-import { CampaignTargetsService } from './campaign-targets.service';
-import { CampaignsController } from './campaigns.controller';
-import { CampaignsService } from './campaigns.service';
-import { CampaignPreviewService } from './preview.service';
-import { TargetResolverService } from './target-resolver.service';
+import { OverlapService } from './services/overlap.service';
+import { CampaignTargetsService } from './services/campaign-targets.service';
+import { CampaignsController } from './controllers/campaigns.controller';
+import { CampaignsService } from './services/campaigns.service';
+import { CampaignPreviewService } from './services/preview.service';
+import { TargetResolverService } from './services/target-resolver.service';
 import { ShopifyModule } from '../shopify/shopify.module';
 import { BillingModule } from '../billing/billing.module';
 import { JobsModule } from '../jobs/jobs.module';
 import { CsvRow } from '../imports/entities/csv-row.entity';
 import { Shop } from '../shops/entities/shop.entity';
-import { ActivationService } from './activation.service';
+import { ActivationService } from './services/activation.service';
 import { CampaignJobHandlers } from './campaign-job.handlers';
-import { RevertService } from './revert.service';
-import { CampaignSchedulerService } from './scheduler.service';
+import { RevertService } from './services/revert.service';
+import { CampaignSchedulerService } from './services/scheduler.service';
 
 /**
  * The campaign aggregate: the container plus everything it owns — its

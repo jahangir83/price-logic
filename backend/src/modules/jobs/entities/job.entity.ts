@@ -106,6 +106,17 @@ export class Job implements JobModel {
   @Column({ name: 'paused_at', type: 'timestamptz', nullable: true })
   pausedAt!: Date | null;
 
+  /**
+   * The bulk operation this job is parked on.
+   *
+   * Denormalised onto the job so the dispatcher can tell at a glance that a
+   * WAITING_BULK job is legitimately waiting rather than stuck, and so the
+   * `bulk_operations/finish` webhook can wake the right job from the operation
+   * id alone.
+   */
+  @Column({ name: 'bulk_operation_id', type: 'uuid', nullable: true })
+  bulkOperationId!: string | null;
+
   @Column({ name: 'total_count', type: 'integer', default: 0 })
   totalCount!: number;
 

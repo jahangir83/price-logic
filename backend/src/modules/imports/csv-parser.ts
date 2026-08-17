@@ -25,6 +25,15 @@ export interface ParsedSheetRow {
   sku: string | null;
   price: Money | null;
   compareAtPrice: Money | null;
+  /**
+   * How many the supplier says they have. Null means the sheet did not say,
+   * which is not the same as zero — most sheets have no stock column at all.
+   */
+  stock: number | null;
+  /** The supplier's own code, when the sheet carries one. */
+  supplierSku: string | null;
+  /** UPC / EAN / GTIN, when the sheet carries one. */
+  barcode: string | null;
   /** Set when the row cannot be used; null when it is fine. */
   error: string | null;
 }
@@ -186,6 +195,9 @@ function validateRow(
   const sku = valueOf(raw, columnMap.sku);
   const rawPrice = valueOf(raw, columnMap.price);
   const rawCompareAt = valueOf(raw, columnMap.compareAtPrice);
+  const stock = parseStock(valueOf(raw, columnMap.stock));
+  const supplierSku = valueOf(raw, columnMap.supplierSku);
+  const barcode = valueOf(raw, columnMap.barcode);
 
   const base: ParsedSheetRow = {
     rowNumber,
@@ -193,6 +205,9 @@ function validateRow(
     sku,
     price: null,
     compareAtPrice: null,
+    stock,
+    supplierSku,
+    barcode,
     error: null,
   };
 
@@ -229,6 +244,44 @@ function validateRow(
   }
 
   return { ...base, price, compareAtPrice: compareAt };
+}
+
+/**
+ * A stock count, or null when the sheet did not give a usable one.
+ *
+ * Deliberately forgiving and deliberately never an error. Stock is an optional
+ * extra: a supplier who writes "in stock", "yes" or "—" has still sent a
+ * perfectly good price, and failing the row over a column that did not have to
+ * be there at all would be the parser inventing a problem.
+ *
+ * Words that plainly mean none are honoured, because "out of stock" as text is
+ * common enough that treating it as unknown would reprice exactly the rows this
+ * feature exists to leave alone.
+ */
+const NO_STOCK_WORDS = new Set([
+  'out of stock',
+  'outofstock',
+  'sold out',
+  'soldout',
+  'unavailable',
+  'no',
+  'none',
+]);
+
+export function parseStock(input: string | null): number | null {
+  if (input === null) return null;
+
+  const text = input.trim().toLowerCase();
+  if (text === '') return null;
+  if (NO_STOCK_WORDS.has(text)) return 0;
+
+  // Thousands separators and a stray unit suffix are common in exports.
+  const cleaned = text.replace(/,/g, '').replace(/\s/g, '');
+  const match = /^-?\d+/.exec(cleaned);
+  if (!match) return null;
+
+  const value = Number(match[0]);
+  return Number.isFinite(value) ? value : null;
 }
 
 function valueOf(

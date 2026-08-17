@@ -4,9 +4,9 @@ import { AppPlan } from './entities/app-plan.entity';
 import { StoreSubscriptionEvent } from './entities/store-subscription-event.entity';
 import { StoreSubscription } from './entities/store-subscription.entity';
 import { StoreUsage } from './entities/store-usage.entity';
-import { BillingService } from './billing.service';
-import { BillingController } from './billing.controller';
-import { SubscriptionsService } from './subscriptions.service';
+import { BillingService } from './services/billing.service';
+import { BillingController } from './controllers/billing.controller';
+import { SubscriptionsService } from './services/subscriptions.service';
 import { AuthModule } from '../../common/auth/auth.module';
 import { ShopifyModule } from '../shopify/shopify.module';
 

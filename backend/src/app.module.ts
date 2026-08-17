@@ -7,6 +7,7 @@ import { AppController } from './app.controller';
 import { AuthModule } from './common/auth/auth.module';
 import { ShopifyAuthModule } from './modules/shopify-auth/shopify-auth.module';
 import { ShopsModule } from './modules/shops/shops.module';
+import { SettingsModule } from './modules/settings/settings.module';
 import { StoreInitModule } from './modules/store-init/store-init.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { SuppliersModule } from './modules/suppliers/suppliers.module';
@@ -38,6 +39,7 @@ import { ShopifyModule } from './modules/shopify/shopify.module';
     AuthModule,
     ShopsModule,
     ShopifyAuthModule,
+    SettingsModule,
     StoreInitModule,
     WebhooksModule,
     SuppliersModule,

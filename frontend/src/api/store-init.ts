@@ -2,36 +2,19 @@ import { apiFetch } from './client';
 
 export type InitializationStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETE';
 
-export interface DefaultSettings {
-  defaultPricingStrategy?:
-    'PERCENTAGE_MARKUP' | 'FIXED_MARKUP' | 'TARGET_MARGIN';
-  minimumMarginPercent?: number;
-  minimumPrice?: number;
-  maximumPrice?: number;
-}
-
+/**
+ * What the app needs before it can render anything.
+ *
+ * Settings used to live here too. They moved to `/settings` when the setup
+ * wizard was retired — this answers "what is this shop", not "what has the
+ * merchant chosen".
+ */
 export interface StoreInitStatus {
   initializationStatus: InitializationStatus;
-  defaultSettings: DefaultSettings;
   /** The shop's own currency — the only authority on how to format money here. */
   currency: string;
 }
 
 export function getStoreInitStatus(): Promise<StoreInitStatus> {
   return apiFetch<StoreInitStatus>('/store-init/status');
-}
-
-export function updateDefaultSettings(
-  settings: DefaultSettings,
-): Promise<{ defaultSettings: DefaultSettings }> {
-  return apiFetch('/store-init/settings', {
-    method: 'PATCH',
-    body: JSON.stringify(settings),
-  });
-}
-
-export function completeStoreSetup(): Promise<{
-  initializationStatus: InitializationStatus;
-}> {
-  return apiFetch('/store-init/complete', { method: 'POST' });
 }

@@ -5,7 +5,7 @@ import type {
   ShopifyProductSummary,
 } from '@pricelogic/shared';
 import { Shop } from '../shops/entities/shop.entity';
-import { ShopsService } from '../shops/shops.service';
+import { ShopsService } from '../shops/services/shops.service';
 import {
   ShopifyAdminService,
   type CatalogVariant,
@@ -14,12 +14,12 @@ import {
   type VariantPriceUpdate,
   type VariantUpdateOutcome,
   type VariantPriceRecord,
-} from './shopify-admin.service';
+} from './services/shopify-admin.service';
 import { ShopifyGraphQlClient } from './shopify-graphql.client';
 import {
   WebhookRegistrarService,
   type WebhookRegistrationResult,
-} from './webhook-registrar.service';
+} from './services/webhook-registrar.service';
 
 /**
  * Everything one shop can do, with the shop already bound.

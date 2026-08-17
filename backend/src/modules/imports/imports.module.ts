@@ -8,8 +8,8 @@ import { ShopifyModule } from '../shopify/shopify.module';
 import { Shop } from '../shops/entities/shop.entity';
 import { CsvImport } from './entities/csv-import.entity';
 import { CsvRow } from './entities/csv-row.entity';
-import { ImportsController } from './imports.controller';
-import { ImportsService } from './imports.service';
+import { ImportsController } from './controllers/imports.controller';
+import { ImportsService } from './services/imports.service';
 import { SheetJobHandlers } from './sheet-job.handlers';
 
 @Module({

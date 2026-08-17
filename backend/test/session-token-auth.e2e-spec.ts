@@ -6,8 +6,8 @@ import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
-import { AppModule } from './../src/app.module';
-import { SESSION_COOKIE_NAME } from './../src/modules/session/session.service';
+import { AppModule } from '../src/app.module';
+import { SESSION_COOKIE_NAME } from '../src/modules/session/services/session.service';
 
 /**
  * Authenticating a real HTTP request with an App Bridge session token.
